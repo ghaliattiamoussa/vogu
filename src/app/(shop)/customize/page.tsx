@@ -247,7 +247,7 @@ export default function CustomizePage() {
   const [stickerPack,setStickerPack]= useState(STICKER_CATEGORIES[0]);
   const [stickerSearch,setStickerSearch]= useState("");
   const [stickerPage,setStickerPage]= useState(1);
-  const [showGuide,  setShowGuide]  = useState(true);
+  // showGuide removed — print area is now always visible
   const [customizerPricing, setCustomizerPricing] = useState<CustomizerPricing>(DEFAULT_CUSTOMIZER_PRICING);
 
   const [textTool, setTextTool] = useState<TextToolState>(createDefaultTextToolState);
@@ -256,7 +256,6 @@ export default function CustomizePage() {
 
   const fileInput = useRef<HTMLInputElement>(null);
   const dragging  = useRef<{ id:string; ox:number; oy:number } | null>(null);
-  const transforming = useRef<{ id:string; mode:"resize"|"rotate"; startX:number; startY:number; startScale:number; startRotation:number; startDistance:number; startAngle:number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   // ── مراجع DOM للعناصر لقياس الأبعاد المعروضة (لاستخدامها في التثبيت داخل منطقة الطباعة) ──
   const elementRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -448,64 +447,24 @@ export default function CustomizePage() {
     dragging.current = { id, ox: e.clientX - el.x, oy: e.clientY - el.y };
   };
 
-  const startTransform = (e: React.PointerEvent, id: string, mode: "resize" | "rotate") => {
-    e.stopPropagation();
-    e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    const el = elements.find(x => x.id === id);
-    if (!el) return;
-    const dx = e.clientX - el.x;
-    const dy = e.clientY - el.y;
-    transforming.current = {
-      id, mode, startX: el.x, startY: el.y, startScale: el.scale, startRotation: el.rotation,
-      startDistance: Math.max(16, Math.hypot(dx, dy)),
-      startAngle: Math.atan2(dy, dx) * 180 / Math.PI,
-    };
-    dragging.current = null;
-    setSelected(id);
-  };
-
   const onPointerMove = (e: React.PointerEvent) => {
-    if (transforming.current) {
-      const t = transforming.current;
-      setElements(prev => prev.map(el => {
-        if (el.id !== t.id) return el;
-        const dx = e.clientX - t.startX;
-        const dy = e.clientY - t.startY;
-        if (t.mode === "resize") {
-          const nextScale = Math.max(0.15, Math.min(5, t.startScale * (Math.hypot(dx, dy) / t.startDistance)));
-          return { ...el, scale: nextScale };
-        }
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        return { ...el, rotation: Math.round((t.startRotation + angle - t.startAngle + 360) % 360) };
-      }));
-      return;
-    }
-    if (!dragging.current) return;
-    const { id, ox, oy } = dragging.current;
-    const nextPos = clampCenterToPrintArea(id, e.clientX - ox, e.clientY - oy);
-    setElements(prev => prev.map(el => el.id === id ? { ...el, x: nextPos.x, y: nextPos.y } : el ));
-  };
+	    if (!dragging.current) return;
+	    const { id, ox, oy } = dragging.current;
+	    const nextPos = clampCenterToPrintArea(id, e.clientX - ox, e.clientY - oy);
+	    setElements(prev => prev.map(el => el.id === id ? { ...el, x: nextPos.x, y: nextPos.y } : el ));
+	  };
 
-  const onPointerUp = () => {
-    if (transforming.current) {
-      // بعد التكبير/التدوير نعيد تثبيت العنصر داخل منطقة الطباعة
-      reclampElement(transforming.current.id);
-      pushHistory(elements);
-      dragging.current = null;
-      transforming.current = null;
-      return;
-    }
-    if (dragging.current) {
-      pushHistory(elements);
-      dragging.current = null;
-    }
-  };
+	  const onPointerUp = () => {
+	    if (dragging.current) {
+	      pushHistory(elements);
+	      dragging.current = null;
+	    }
+	  };
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     if (!selected) return;
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.06 : 0.06;
+	    const delta = e.deltaY > 0 ? -0.04 : 0.04;
     setElements(prev => prev.map(el => {
       if (el.id !== selected) return el;
       const nextScale = Math.max(0.15, Math.min(5, el.scale + delta));
@@ -776,13 +735,7 @@ export default function CustomizePage() {
             ))}
           </div>
 
-          <button onClick={() => setShowGuide(g => !g)} style={{
-            ...iconBtn, width: isMobile ? 30 : 34, height: isMobile ? 30 : 34, background: showGuide ? "#FEF3C7" : "#FFFFFF",
-            border: `1px solid ${showGuide ? "#C9A86E" : "#E5E7EB"}`, color: showGuide ? "#C9A86E" : "#6B7280", fontSize:10,
-            display: isMobile ? "none" : "flex",
-          }} title="منطقة الطباعة">⊞</button>
-
-          {!isMobile && (
+	          {!isMobile && (
             <div style={{
               background:"#FAF9F6", border:"1px solid #E5E7EB", borderRadius:10, padding:"7px 12px",
               color:"#1A1A1A", fontFamily:"Tajawal, sans-serif", fontSize:12, fontWeight:700,
@@ -1100,15 +1053,15 @@ export default function CustomizePage() {
                 {/* أزرار الحجم السريعة (للنص/الصورة) */}
                 {selectedEl.type !== "sticker" && (
                   <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                    <button onClick={() => scaleSelected(-0.1)} style={iconBtn}><Minus size={12}/></button>
+                    <button onClick={() => scaleSelected(-0.05)} style={iconBtn}><Minus size={12}/></button>
                     <span style={{ flex:1, textAlign:"center", fontSize:11, color:"#6B7280", fontFamily:"Tajawal, sans-serif" }}>الحجم {Math.round(selectedEl.scale * 100)}%</span>
-                    <button onClick={() => scaleSelected(0.1)} style={iconBtn}><Plus size={12}/></button>
+                    <button onClick={() => scaleSelected(0.05)} style={iconBtn}><Plus size={12}/></button>
                   </div>
                 )}
                 <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <button onClick={() => rotateSelected(-15)} style={iconBtn}><RotateCcw size={12}/></button>
-                  <span style={{ flex:1, textAlign:"center", fontSize:11, color:"#6B7280", fontFamily:"Tajawal, sans-serif" }}>{selectedEl.rotation}°</span>
-                  <button onClick={() => rotateSelected(15)} style={iconBtn}><RotateCw size={12}/></button>
+	                  <button onClick={() => rotateSelected(-10)} style={iconBtn}><RotateCcw size={12}/></button>
+	                  <span style={{ flex:1, textAlign:"center", fontSize:11, color:"#6B7280", fontFamily:"Tajawal, sans-serif" }}>{selectedEl.rotation}°</span>
+	                  <button onClick={() => rotateSelected(10)} style={iconBtn}><RotateCw size={12}/></button>
                 </div>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
                   <button onClick={flipSelected} style={{ ...iconBtn, width:"100%", fontSize:11, fontFamily:"Tajawal, sans-serif" }}>Flip</button>
@@ -1220,120 +1173,116 @@ export default function CustomizePage() {
             })}
               </div>
             </div>
-            {/* ═══ شريط أدوات العنصر المحدد (بدون مقابض resize/rotate) ═══ */}
-            {(() => {
-              const el = elements.find(e => e.id === selected);
-              if (!el) return null;
-              return (
-                <>
-                  {/* ── شريط أدوات صغير فوق العنصر المحدد ── */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.92 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                    style={{
-                      position:"absolute",
-                      left: el.x, top: el.y,
-                      transform: `translate(-50%, calc(-100% - 12px))`,
-                      zIndex: 35,
-                      pointerEvents:"auto",
-                      display:"flex",
-                      alignItems:"center",
-                      gap: 2,
-                      background:"#FFFFFF",
-                      border:"1px solid #E5E7EB",
-                      borderRadius:10,
-                      padding:"4px 5px",
-                      boxShadow:"0 4px 16px rgba(0,0,0,0.1)",
-                      fontFamily:"Tajawal, sans-serif",
-                    }}
-                  >
-                    {/* X حذف */}
-                    <button
-                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                      onClick={e => { e.stopPropagation(); deleteSelected(); }}
-                      style={{
-                        width:28, height:28, borderRadius:7,
-                        background:"#FFF5F5", border:"1px solid #FCA5A5",
-                        color:"#DC2626", cursor:"pointer",
-                        display:"flex", alignItems:"center", justifyContent:"center",
-                      }}
-                    >
-                      <X size={13}/>
-                    </button>
+            {/* ═══ شريط أدوات العنصر المحدد — ثابت في منتصف أسفل الكانفاس ═══ */}
+	            {(() => {
+	              const el = elements.find(e => e.id === selected);
+	              if (!el) return null;
+	              return (
+	                  <motion.div
+	                    initial={{ opacity: 0, y: 10 }}
+	                    animate={{ opacity: 1, y: 0 }}
+	                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+	                    style={{
+	                      position:"absolute",
+	                      bottom: 8,
+	                      left: "50%",
+	                      transform: "translateX(-50%)",
+	                      zIndex: 35,
+	                      pointerEvents:"auto",
+	                      display:"flex",
+	                      alignItems:"center",
+	                      gap: 2,
+	                      background:"#FFFFFF",
+	                      border:"1px solid #E5E7EB",
+	                      borderRadius:10,
+	                      padding:"4px 6px",
+	                      boxShadow:"0 4px 16px rgba(0,0,0,0.12)",
+	                      fontFamily:"Tajawal, sans-serif",
+	                    }}
+	                  >
+	                    {/* حذف */}
+	                    <button
+	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+	                      onClick={e => { e.stopPropagation(); deleteSelected(); }}
+	                      style={{
+	                        width:28, height:28, borderRadius:7,
+	                        background:"#FFF5F5", border:"1px solid #FCA5A5",
+	                        color:"#DC2626", cursor:"pointer",
+	                        display:"flex", alignItems:"center", justifyContent:"center",
+	                      }}
+	                    >
+	                      <X size={13}/>
+	                    </button>
 
-                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
+	                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
 
-                    {/* تكبير */}
-                    <button
-                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                      onClick={e => { e.stopPropagation(); scaleSelected(0.15); }}
-                      style={{ ...iconBtn, width:28, height:28, borderRadius:7, fontSize:15 }}>
-                      +
-                    </button>
+	                    {/* تصغير */}
+	                    <button
+	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+	                      onClick={e => { e.stopPropagation(); scaleSelected(-0.05); }}
+	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7, fontSize:15 }}>
+	                      −
+	                    </button>
 
-                    {/* تصغير */}
-                    <button
-                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                      onClick={e => { e.stopPropagation(); scaleSelected(-0.15); }}
-                      style={{ ...iconBtn, width:28, height:28, borderRadius:7, fontSize:15 }}>
-                      −
-                    </button>
+	                    {/* تكبير */}
+	                    <button
+	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+	                      onClick={e => { e.stopPropagation(); scaleSelected(0.05); }}
+	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7, fontSize:15 }}>
+	                      +
+	                    </button>
 
-                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
+	                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
 
-                    {/* دوران يمين */}
-                    <button
-                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                      onClick={e => { e.stopPropagation(); rotateSelected(15); }}
-                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-                      <RotateCw size={12}/>
-                    </button>
+	                    {/* دوران يسار */}
+	                    <button
+	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+	                      onClick={e => { e.stopPropagation(); rotateSelected(-10); }}
+	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
+	                      <RotateCcw size={12}/>
+	                    </button>
 
-                    {/* دوران يسار */}
-                    <button
-                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                      onClick={e => { e.stopPropagation(); rotateSelected(-15); }}
-                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-                      <RotateCcw size={12}/>
-                    </button>
+	                    {/* دوران يمين */}
+	                    <button
+	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+	                      onClick={e => { e.stopPropagation(); rotateSelected(10); }}
+	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
+	                      <RotateCw size={12}/>
+	                    </button>
 
-                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
+	                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
 
-                    {/* نسخ */}
-                    <button
-                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                      onClick={e => { e.stopPropagation(); duplicateSelected(); }}
-                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-                      <span style={{fontSize:11, fontWeight:700}}>📋</span>
-                    </button>
+	                    {/* نسخ */}
+	                    <button
+	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+	                      onClick={e => { e.stopPropagation(); duplicateSelected(); }}
+	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
+	                      <span style={{fontSize:11, fontWeight:700}}>📋</span>
+	                    </button>
 
-                    {/* تقليب */}
-                    <button
-                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                      onClick={e => { e.stopPropagation(); flipSelected(); }}
-                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-                      <span style={{fontSize:12}}>↔</span>
-                    </button>
-                  </motion.div>
-                </>
-              );
-            })()}
-            {/* Print Area Guide */}
-            {showGuide && (
-              <div style={{
-                position:"absolute",
-                top: `${activePrintArea.top}%`, left: `${activePrintArea.left}%`,
-                width: `${activePrintArea.width}%`, height: `${activePrintArea.height}%`,
-                border:"2px dashed #C9A86E",
-                borderRadius:4, opacity:0.6, pointerEvents:"none", zIndex:1,
+	                    {/* تقليب */}
+	                    <button
+	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+	                      onClick={e => { e.stopPropagation(); flipSelected(); }}
+	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
+	                      <span style={{fontSize:12}}>↔</span>
+	                    </button>
+	                  </motion.div>
+	              );
+	            })()}
+            {/* Print Area Guide — always visible */}
+	            <div style={{
+	              position:"absolute",
+	              top: `${activePrintArea.top}%`, left: `${activePrintArea.left}%`,
+	              width: `${activePrintArea.width}%`, height: `${activePrintArea.height}%`,
+	              border:"2px dashed #C9A86E",
+	              borderRadius:4, opacity:0.5, pointerEvents:"none", zIndex:1,
                 display:"flex", alignItems:"center", justifyContent:"center",
               }}>
                 <span style={{color:"#C9A86E", fontSize:10, background:"#F5F5F0", padding:"2px 6px", borderRadius:4}}>منطقة الطباعة</span>
               </div>
-            )}
 
-            {/* Product Image / SVG */}
+	            {/* Product Image / SVG */}
             {currentImage ? (
               <img src={currentImage} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Product" />
             ) : (
@@ -1778,15 +1727,15 @@ export default function CustomizePage() {
 
                         {selectedEl.type !== "sticker" && (
                           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <button onClick={() => scaleSelected(-0.1)} style={{...iconBtn, minWidth:40}}><Minus size={14}/></button>
+                            <button onClick={() => scaleSelected(-0.05)} style={{...iconBtn, minWidth:40}}><Minus size={14}/></button>
                             <span style={{ flex:1, textAlign:"center", fontSize:12, color:"#6B7280", fontFamily:"Tajawal, sans-serif" }}>الحجم {Math.round(selectedEl.scale * 100)}%</span>
-                            <button onClick={() => scaleSelected(0.1)} style={{...iconBtn, minWidth:40}}><Plus size={14}/></button>
+                            <button onClick={() => scaleSelected(0.05)} style={{...iconBtn, minWidth:40}}><Plus size={14}/></button>
                           </div>
                         )}
                         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                          <button onClick={() => rotateSelected(-15)} style={{...iconBtn, minWidth:40}}><RotateCcw size={14}/></button>
+                          <button onClick={() => rotateSelected(-10)} style={{...iconBtn, minWidth:40}}><RotateCcw size={14}/></button>
                           <span style={{ flex:1, textAlign:"center", fontSize:12, color:"#6B7280", fontFamily:"Tajawal, sans-serif" }}>{selectedEl.rotation}°</span>
-                          <button onClick={() => rotateSelected(15)} style={{...iconBtn, minWidth:40}}><RotateCw size={14}/></button>
+                          <button onClick={() => rotateSelected(10)} style={{...iconBtn, minWidth:40}}><RotateCw size={14}/></button>
                         </div>
                         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
                           <button onClick={flipSelected} style={{ ...iconBtn, width:"100%", fontSize:12, fontFamily:"Tajawal, sans-serif", padding:"8px" }}>قلب</button>
