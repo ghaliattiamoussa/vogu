@@ -246,6 +246,8 @@ export default function CustomizePage() {
 
   const [designByView, setDesignByView] = useState<Record<DesignView, DesignElement[]>>({ front: [], back: [], rightSleeve: [], leftSleeve: [] });
   const [selected,   setSelected]   = useState<string | null>(null);
+  // ✅ العنصر المضغوط عليه حالياً (لإظهار الحدود فقط أثناء اللمس/الضغط)
+  const [activePress, setActivePress] = useState<string | null>(null);
   const [tool,       setTool]       = useState<"select"|"text"|"sticker"|"upload"|"ai">("select");
   const [history,    setHistory]    = useState<DesignElement[][]>([[]]);
   const [histIdx,    setHistIdx]    = useState(0);
@@ -357,11 +359,23 @@ export default function CustomizePage() {
   };
 
   const updateTextTool = (patch: Partial<TextToolState> & { style?: Partial<TextToolState["style"]> }) => {
-    setTextTool((prev) => ({
-      ...prev,
-      ...patch,
-      style: patch.style ? { ...prev.style, ...patch.style } : prev.style,
-    }));
+    setTextTool((prev) => {
+      const next = {
+        ...prev,
+        ...patch,
+        style: patch.style ? { ...prev.style, ...patch.style } : prev.style,
+      };
+      // ✅ تطبيق تلقائي على العنصر المحدد فور التغيير (بدون الحاجة لزر "تطبيق")
+      if (selected && selectedEl?.type === "text" && next.textInput.trim()) {
+        const payload = buildTextPayloadFromState(next);
+        setElements((prevEls) =>
+          prevEls.map((el) =>
+            el.id === selected && el.type === "text" ? { ...el, ...payload } : el,
+          ),
+        );
+      }
+      return next;
+    });
   };
 
   /* ═══════════════════════════════════════════════════════
@@ -466,6 +480,7 @@ export default function CustomizePage() {
   const onPointerDown = (e: React.PointerEvent, id: string) => {
     e.stopPropagation();
     setSelected(id);
+    setActivePress(id);
     const el = elements.find(x => x.id === id)!;
     dragging.current = { id, ox: e.clientX - el.x, oy: e.clientY - el.y };
     // ── long-press للوحة سياق على اللمس (الموبايل) ──
@@ -502,6 +517,7 @@ export default function CustomizePage() {
       ...(corner ? { corner } as any : {}),
     };
     dragging.current = null; // أوقف السحب العادي
+    setActivePress(el.id);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -544,12 +560,14 @@ export default function CustomizePage() {
 		    if (handleDragRef.current) {
 		      pushHistory(elements);
 		      handleDragRef.current = null;
+		      setActivePress(null);
 		      return;
 		    }
 		    if (dragging.current) {
 		      pushHistory(elements);
 		      dragging.current = null;
 		    }
+		    setActivePress(null);
 		  };
 
   // ── قائمة السياق (كليك يمين) على العناصر ──
@@ -599,6 +617,7 @@ export default function CustomizePage() {
 	      pushHistory(elements);
 	      pinchRef.current = null;
 	    }
+	    setActivePress(null);
 	  }, [elements, pushHistory]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
@@ -905,7 +924,7 @@ export default function CustomizePage() {
             fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 12, cursor:"pointer",
             transition:"all 0.2s",
           }}>
-            🔄 {isMobile ? "المنتج" : "تغيير المنتج"}
+            🔄 تغيير المنتج
           </button>
 
           {/* أزرار تراجع / تقدم */}
@@ -1340,8 +1359,8 @@ export default function CustomizePage() {
                     borderRadius: el.type==="image" ? 4 : 0,
                     userSelect:"none", zIndex: isSelected ? 10 : 5,
                     pointerEvents: "auto",
-                    // ✅ إطار تحديد مثل customink
-                    outline: isSelected ? "2px dashed #C9A86E" : "none",
+                    // ✅ إطار تحديد يظهر فقط أثناء الضغط/اللمس الفعلي على العنصر
+                    outline: activePress === el.id ? "2px dashed #C9A86E" : "none",
                     outlineOffset: 6,
                   }}
                 >
@@ -1640,6 +1659,21 @@ export default function CustomizePage() {
             padding: "6px 8px", display: "flex", alignItems: "center", gap: 6,
             overflowX: "auto",
           }}>
+            {/* السعر / زر الإضافة للسلة — أقصى اليسار */}
+            <button
+              onClick={handleAddToCart}
+              style={{
+                flexShrink:0, order: -1, display:"flex", alignItems:"center", gap:4,
+                background:"linear-gradient(135deg,#C9A86E,#9A7848)", border:"none", borderRadius:7,
+                padding:"5px 10px", cursor:"pointer",
+              }}
+            >
+              <ShoppingBag size={11} style={{color:"#FFFFFF"}}/>
+              <span style={{ fontSize:10, color:"#FFFFFF", fontWeight:700, fontFamily:"Tajawal, sans-serif" }}>
+                إضافة للسلة
+              </span>
+            </button>
+
             <span style={{ fontSize: 8, color: "#9CA3AF", flexShrink: 0, fontFamily: "Tajawal, sans-serif", letterSpacing: "0.1em" }}>المعاينة</span>
             {DESIGN_VIEWS.map(v => {
               const hasElements = (designByView[v] ?? []).length > 0;
@@ -1674,14 +1708,6 @@ export default function CustomizePage() {
                 </motion.button>
               );
             })}
-            {/* عرض السعر في الشريط */}
-            <div style={{ flexShrink:0, marginRight:"auto", display:"flex", alignItems:"center", gap:4,
-              background:"#FAF9F6", border:"1px solid #E5E7EB", borderRadius:7, padding:"3px 8px" }}>
-              <span style={{ fontSize:9, color:"#9CA3AF", fontFamily:"Tajawal, sans-serif" }}>السعر</span>
-              <span style={{ fontSize:11, color:"#A8823C", fontWeight:700, fontFamily:"Tajawal, sans-serif" }}>
-                {liveTotalPrice.toLocaleString("ar-EG")} ج.م
-              </span>
-            </div>
           </div>
 
           {/* ── Bottom Toolbar (الأيقونات الثابتة) ── */}
@@ -1698,7 +1724,6 @@ export default function CustomizePage() {
               { key: "text",    label: "نص",    icon: <Type size={17}/>, active: tool==="text" },
               { key: "sticker", label: "ستيكر", icon: <Smile size={17}/>, active: tool==="sticker" },
               { key: "upload",  label: "صورة",  icon: <Upload size={16}/>, active: tool==="upload" },
-              { key: "ai",      label: "AI",    icon: <Sparkles size={16}/>, active: tool==="ai" },
             ] as const).map((item) => (
               <motion.button
                 key={item.key}
@@ -1707,9 +1732,8 @@ export default function CustomizePage() {
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 onClick={() => {
                   const k = item.key;
-                  if (k === "text" || k === "sticker" || k === "upload" || k === "ai") {
+                  if (k === "text" || k === "sticker" || k === "upload") {
                     setTool(k as any);
-                    if (k === "ai") setAiPanelOpen(true);
                     setBottomSheetContent(k as any);
                   } else {
                     setBottomSheetContent(k as any);
@@ -2028,7 +2052,7 @@ export default function CustomizePage() {
               transition={{ type: "spring", stiffness: 350, damping: 20 }}
               onClick={() => { setBottomSheetContent("selected"); setBottomSheetOpen(true); }}
               style={{
-                position: "fixed", bottom: 124, left: 12, zIndex: 45,
+                position: "fixed", bottom: 124, right: 12, zIndex: 45,
                 background: "linear-gradient(135deg,#C9A86E,#9A7848)", color: "#FFFFFF",
                 border: "none", borderRadius: 12, padding: "9px 14px",
                 display: "flex", alignItems: "center", gap: 5,
