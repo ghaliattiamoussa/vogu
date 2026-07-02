@@ -31,7 +31,9 @@ function useMediaQuery(query: string): boolean {
 }
 import {
   Type, Smile, Upload, RotateCcw, Trash2,
-  ShoppingBag, Minus, Plus, RotateCw, Sparkles, Send, X
+  ShoppingBag, Minus, Plus, RotateCw, Sparkles, Send, X,
+  Copy, FlipHorizontal, ChevronsUp, ChevronsDown, Crosshair, Layers,
+  Lock, Unlock, ZoomIn, ZoomOut, Move, Edit3, ChevronUp
 } from "lucide-react";
 
 /* ═══ ملاحظة مهمة: أضف flipX?: boolean إلى DesignElement في ملف customizeAi.ts ═══ */
@@ -263,7 +265,23 @@ export default function CustomizePage() {
   const pinchRef = useRef<{ active: boolean; startDist: number; startScale: number; id: string } | null>(null);
   // ── مراجع DOM للعناصر لقياس الأبعاد المعروضة (لاستخدامها في التثبيت داخل منطقة الطباعة) ──
   const elementRefs = useRef<Map<string, HTMLElement>>(new Map());
+  // ── مرجع لتحريك مقابض التكبير/التدوير ──
+  const handleDragRef = useRef<{
+    type: 'resize' | 'rotate';
+    id: string;
+    startX: number;
+    startY: number;
+    startScale: number;
+    startRotation: number;
+    centerX: number;
+    centerY: number;
+    startDist: number;
+  } | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
+
+  // ── Context menu (right-click / long-press) ──
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; id: string } | null>(null);
+  const longPressRef = useRef<{ timer: number | null; startX: number; startY: number } | null>(null);
 
   // ── Bottom Sheet state (mobile only) ──
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
@@ -449,23 +467,138 @@ export default function CustomizePage() {
     setSelected(id);
     const el = elements.find(x => x.id === id)!;
     dragging.current = { id, ox: e.clientX - el.x, oy: e.clientY - el.y };
+    // ── long-press للوحة سياق على اللمس (الموبايل) ──
+    if (e.pointerType === "touch") {
+      longPressRef.current = { timer: null, startX: e.clientX, startY: e.clientY };
+      longPressRef.current.timer = window.setTimeout(() => {
+        setContextMenu({ x: longPressRef.current!.startX, y: longPressRef.current!.startY, id });
+        dragging.current = null;
+        longPressRef.current = null;
+      }, 520);
+    }
+  };
+
+  // ── بدء تحريك مقبض التكبير/التدوير ──
+  const startHandleDrag = (e: React.PointerEvent, el: DesignElement, type: 'resize' | 'rotate', corner?: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.pointerType === "touch") {
+      // ألغِ الـ long-press
+      if (longPressRef.current?.timer) clearTimeout(longPressRef.current.timer);
+      longPressRef.current = null;
+    }
+    // احصل على المركز الفعلي للعنصر على الشاشة
+    const node = elementRefs.current.get(el.id);
+    const rect = node?.getBoundingClientRect();
+    const cx = rect ? rect.left + rect.width / 2 : el.x;
+    const cy = rect ? rect.top + rect.height / 2 : el.y;
+    const startDist = Math.max(20, Math.hypot(e.clientX - cx, e.clientY - cy));
+    handleDragRef.current = {
+      type, id: el.id,
+      startX: e.clientX, startY: e.clientY,
+      startScale: el.scale, startRotation: el.rotation,
+      centerX: cx, centerY: cy, startDist,
+      ...(corner ? { corner } as any : {}),
+    };
+    dragging.current = null; // أوقف السحب العادي
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+		    // ألغِ الـ long-press لو في حركة واضحة
+		    if (longPressRef.current) {
+		      const dx = e.clientX - longPressRef.current.startX;
+		      const dy = e.clientY - longPressRef.current.startY;
+		      if (Math.hypot(dx, dy) > 8) {
+		        if (longPressRef.current.timer) clearTimeout(longPressRef.current.timer);
+		        longPressRef.current = null;
+		      }
+		    }
+		    // ── تحريك مقابض التكبير/التدوير ──
+		    if (handleDragRef.current) {
+		      const h = handleDragRef.current;
+		      if (h.type === 'rotate') {
+		        const angle = Math.atan2(e.clientY - h.centerY, e.clientX - h.centerX);
+		        const startAngle = Math.atan2(h.startY - h.centerY, h.startX - h.centerX);
+		        let deg = h.startRotation + (angle - startAngle) * (180 / Math.PI);
+		        deg = ((deg % 360) + 360) % 360;
+		        setElements(prev => prev.map(el => el.id === h.id ? { ...el, rotation: deg } : el));
+		      } else if (h.type === 'resize') {
+		        const newDist = Math.max(20, Math.hypot(e.clientX - h.centerX, e.clientY - h.centerY));
+		        const ratio = newDist / h.startDist;
+		        const nextScale = Math.max(0.15, Math.min(5, h.startScale * ratio));
+		        setElements(prev => prev.map(el => el.id === h.id ? { ...el, scale: nextScale } : el));
+		      }
+		      return;
+		    }
 		    if (!dragging.current) return;
 		    const { id, ox, oy } = dragging.current;
-		    // حرية الحركة الكاملة — بدون تثبيت (الـ clip layer بتاع منطقة الطباعة بيقفل الجزء الخارج)
 		    const nextX = e.clientX - ox;
 		    const nextY = e.clientY - oy;
 		    setElements(prev => prev.map(el => el.id === id ? { ...el, x: nextX, y: nextY } : el ));
 		  };
 
-	  const onPointerUp = () => {
-	    if (dragging.current) {
-	      pushHistory(elements);
+		  const onPointerUp = () => {
+		    if (longPressRef.current?.timer) clearTimeout(longPressRef.current.timer);
+		    longPressRef.current = null;
+		    if (handleDragRef.current) {
+		      pushHistory(elements);
+		      handleDragRef.current = null;
+		      return;
+		    }
+		    if (dragging.current) {
+		      pushHistory(elements);
+		      dragging.current = null;
+		    }
+		  };
+
+  // ── قائمة السياق (كليك يمين) على العناصر ──
+  const onElementContextMenu = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelected(id);
+    setContextMenu({ x: e.clientX, y: e.clientY, id });
+  };
+
+	  // ── Pinch-to-zoom بالبنصرين ──
+	  const getTouchDist = (touches: React.TouchList) => {
+	    const dx = touches[0].clientX - touches[1].clientX;
+	    const dy = touches[0].clientY - touches[1].clientY;
+	    return Math.hypot(dx, dy);
+	  };
+
+	  const onTouchStart = useCallback((e: React.TouchEvent) => {
+	    if (e.touches.length === 2 && selected) {
+	      // أوقف الـ long-press عند بدء الـ pinch
+	      if (longPressRef.current?.timer) clearTimeout(longPressRef.current.timer);
+	      longPressRef.current = null;
+	      e.preventDefault();
+	      pinchRef.current = {
+	        active: true,
+	        startDist: Math.max(20, getTouchDist(e.touches)),
+	        startScale: elements.find(x => x.id === selected)?.scale ?? 1,
+	        id: selected,
+	      };
+	      // أوقف السحب لما يبدأ الـ pinch
 	      dragging.current = null;
 	    }
-	  };
+	  }, [selected, elements]);
+
+	  const onTouchMove = useCallback((e: React.TouchEvent) => {
+	    if (!pinchRef.current || !pinchRef.current.active || e.touches.length < 2) return;
+	    e.preventDefault();
+	    const dist = Math.max(20, getTouchDist(e.touches));
+	    const ratio = dist / pinchRef.current.startDist;
+	    const nextScale = Math.max(0.15, Math.min(5, pinchRef.current.startScale * ratio));
+	    const id = pinchRef.current.id;
+	    setElements(prev => prev.map(el => el.id === id ? { ...el, scale: nextScale } : el));
+	  }, []);
+
+	  const onTouchEnd = useCallback(() => {
+	    if (pinchRef.current?.active) {
+	      pushHistory(elements);
+	      pinchRef.current = null;
+	    }
+	  }, [elements, pushHistory]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
 	    if (!selected) return;
@@ -523,6 +656,34 @@ export default function CustomizePage() {
     const copy = { ...el, id: `${Date.now()}`, x: el.x + 18, y: el.y + 18 };
     const next = [...elements, copy];
     setElements(next); pushHistory(next); setSelected(copy.id);
+  };
+
+  // ── ترتيب الطبقات (bring to front / send to back) ──
+  const bringToFront = () => {
+    if (!selected) return;
+    const idx = elements.findIndex(e => e.id === selected);
+    if (idx < 0 || idx === elements.length - 1) return;
+    const next = [...elements];
+    const [item] = next.splice(idx, 1);
+    next.push(item);
+    setElements(next); pushHistory(next);
+  };
+  const sendToBack = () => {
+    if (!selected) return;
+    const idx = elements.findIndex(e => e.id === selected);
+    if (idx <= 0) return;
+    const next = [...elements];
+    const [item] = next.splice(idx, 1);
+    next.unshift(item);
+    setElements(next); pushHistory(next);
+  };
+  const centerSelected = () => {
+    if (!selected) return;
+    const b = getPrintBounds();
+    const cx = (b.minX + b.maxX) / 2;
+    const cy = (b.minY + b.maxY) / 2;
+    const next = elements.map(el => el.id === selected ? { ...el, x: cx, y: cy } : el);
+    setElements(next); pushHistory(next);
   };
 
   const applyAiResult = useCallback((result: {
@@ -668,6 +829,9 @@ export default function CustomizePage() {
       return (
         <div style={{
           ...buildTextCss(el),
+          // ✅ امنع الالتفاف عند الحواف — يبقى العنصر كما هو (لا يصبح عمودياً)
+          whiteSpace: "pre",
+          width: "max-content",
           minWidth: el.textAlign === "center" ? 40 : undefined,
         }}>{el.content}</div>
       );
@@ -700,7 +864,9 @@ export default function CustomizePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" dir="rtl" style={{ fontFamily:"Tajawal, sans-serif" }} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+    <div className="min-h-screen bg-[#FAF9F6]" dir="rtl" style={{ fontFamily:"Tajawal, sans-serif" }} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+      onContextMenu={(e) => { /* امنع القائمة الافتراضية فقط داخل منطقة التصميم */ }}
+    >
 
       {/* ═══ Header ═══ */}
       <div style={{
@@ -1115,24 +1281,21 @@ export default function CustomizePage() {
               transition: "width 0.3s, height 0.3s"
             }}
             onWheel={onWheel}
-            onClick={() => setSelected(null)}
+            onClick={() => { setSelected(null); setContextMenu(null); }}
           >
-            {/* ═══ طبقة قص (clip) — كل العناصر خارج منطقة الطباعة تُخفى ═══ */}
+            {/* ═══ طبقة قص (clip-path) — العناصر خارج منطقة الطباعة تُخفى بدون التفاف ═══ */}
             <div style={{
-              position:"absolute",
-              top: `${activePrintArea.top}%`, left: `${activePrintArea.left}%`,
-              width: `${activePrintArea.width}%`, height: `${activePrintArea.height}%`,
-              overflow:"hidden",
+              position:"absolute", inset: 0,
+              // ✅ clip-path يخفي الجزء الخارج بدون أن يُجبر المحتوى على الالتفاف
+              clipPath: `polygon(${activePrintArea.left}% ${activePrintArea.top}%, ${activePrintArea.left + activePrintArea.width}% ${activePrintArea.top}%, ${activePrintArea.left + activePrintArea.width}% ${activePrintArea.top + activePrintArea.height}%, ${activePrintArea.left}% ${activePrintArea.top + activePrintArea.height}%)`,
+              WebkitClipPath: `polygon(${activePrintArea.left}% ${activePrintArea.top}%, ${activePrintArea.left + activePrintArea.width}% ${activePrintArea.top}%, ${activePrintArea.left + activePrintArea.width}% ${activePrintArea.top + activePrintArea.height}%, ${activePrintArea.left}% ${activePrintArea.top + activePrintArea.height}%)`,
               zIndex: 4,
               pointerEvents: "none",
             }}>
-              <div style={{ position:"relative", width:"100%", height:"100%" }} id="design-elements-clip">
-            {/* العناصر تُرسم داخل هذه الطبقة المقطوعة */}
+            {/* العناصر تُرسم هنا */}
             {elements.map(el => {
               const safeEl = el as SafeElement;
-              // نُعيد وضع العنصر بالنسبة لطبقة الـclip (تحويل الإحداثيات)
-              const clipLeft = (activePrintArea.left / 100) * (canvasBaseW * sizeScale);
-              const clipTop = (activePrintArea.top / 100) * (canvasBaseH * sizeScale);
+              const isSelected = selected === el.id;
               return (
                 <motion.div
                   key={el.id}
@@ -1140,39 +1303,132 @@ export default function CustomizePage() {
                     if (node) elementRefs.current.set(el.id, node);
                     else elementRefs.current.delete(el.id);
                   }}
-	                  onPointerDown={e => onPointerDown(e, el.id)}
-	                  onClick={e => { e.stopPropagation(); setSelected(el.id); }}
-	                  style={{
-	                    position:"absolute",
-	                    left: el.x - clipLeft,
-	                    top: el.y - clipTop,
-	                    transform:`translate(-50%,-50%) rotate(${el.rotation}deg) scale(${el.scale})${safeEl.flipX ? " scaleX(-1)" : ""}`,
-	                    cursor: dragging.current?.id === el.id ? "grabbing" : "grab",
-	                    touchAction:"none",
-	                    borderRadius: el.type==="image" ? 4 : 0,
-	                    userSelect:"none", zIndex: selected===el.id ? 10 : 5,
-	                    pointerEvents: "auto",
-	                  }}
+                  onPointerDown={e => onPointerDown(e, el.id)}
+                  onContextMenu={e => onElementContextMenu(e, el.id)}
+                  onClick={e => { e.stopPropagation(); setSelected(el.id); }}
+                  style={{
+                    position:"absolute",
+                    left: el.x,
+                    top: el.y,
+                    width: "max-content",
+                    height: "max-content",
+                    transform:`translate(-50%,-50%) rotate(${el.rotation}deg) scale(${el.scale})${safeEl.flipX ? " scaleX(-1)" : ""}`,
+                    cursor: dragging.current?.id === el.id ? "grabbing" : "grab",
+                    touchAction:"none",
+                    borderRadius: el.type==="image" ? 4 : 0,
+                    userSelect:"none", zIndex: isSelected ? 10 : 5,
+                    pointerEvents: "auto",
+                    // ✅ إطار تحديد مثل customink
+                    outline: isSelected ? "2px dashed #C9A86E" : "none",
+                    outlineOffset: 6,
+                  }}
                 >
                   {renderElementContent(el)}
+                  {/* ═══ مقابض التحكم (Resize Handles) — تظهر فقط للعنصر المحدد ═══ */}
+                  {isSelected && (
+                    <>
+                      {/* الزاوية العلوية اليمنى */}
+                      <div style={{
+                        position:"absolute", top:-7, right:-7, width:14, height:14,
+                        background:"#C9A86E", border:"2px solid #FFFFFF", borderRadius:3,
+                        cursor:"nwse-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 'tr'); }}
+                      />
+                      {/* الزاوية السفلية اليسرى */}
+                      <div style={{
+                        position:"absolute", bottom:-7, left:-7, width:14, height:14,
+                        background:"#C9A86E", border:"2px solid #FFFFFF", borderRadius:3,
+                        cursor:"nwse-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 'bl'); }}
+                      />
+                      {/* الزاوية العلوية اليسرى */}
+                      <div style={{
+                        position:"absolute", top:-7, left:-7, width:14, height:14,
+                        background:"#C9A86E", border:"2px solid #FFFFFF", borderRadius:3,
+                        cursor:"nesw-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 'tl'); }}
+                      />
+                      {/* الزاوية السفلية اليمنى */}
+                      <div style={{
+                        position:"absolute", bottom:-7, right:-7, width:14, height:14,
+                        background:"#C9A86E", border:"2px solid #FFFFFF", borderRadius:3,
+                        cursor:"nesw-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 'br'); }}
+                      />
+                      {/* الحافة العلوية */}
+                      <div style={{
+                        position:"absolute", top:-5, left:"50%", transform:"translateX(-50%)",
+                        width:28, height:10, background:"transparent",
+                        cursor:"ns-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 't'); }}
+                      />
+                      {/* الحافة السفلية */}
+                      <div style={{
+                        position:"absolute", bottom:-5, left:"50%", transform:"translateX(-50%)",
+                        width:28, height:10, background:"transparent",
+                        cursor:"ns-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 'b'); }}
+                      />
+                      {/* الحافة اليمنى */}
+                      <div style={{
+                        position:"absolute", top:"50%", right:-5, transform:"translateY(-50%)",
+                        width:10, height:28, background:"transparent",
+                        cursor:"ew-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 'r'); }}
+                      />
+                      {/* الحافة اليسرى */}
+                      <div style={{
+                        position:"absolute", top:"50%", left:-5, transform:"translateY(-50%)",
+                        width:10, height:28, background:"transparent",
+                        cursor:"ew-resize", zIndex:20, pointerEvents:"auto", touchAction:"none",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'resize', 'l'); }}
+                      />
+                      {/* مقبض التدوير (أعلى العنصر) */}
+                      <div style={{
+                        position:"absolute", top:-32, left:"50%", transform:"translateX(-50%)",
+                        width:22, height:22, background:"#FFFFFF", border:"2px solid #C9A86E",
+                        borderRadius:"50%", cursor:"crosshair", zIndex:20,
+                        pointerEvents:"auto", touchAction:"none",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        boxShadow:"0 2px 6px rgba(0,0,0,0.15)",
+                      }}
+                        onPointerDown={e => { e.stopPropagation(); startHandleDrag(e, el, 'rotate'); }}
+                      >
+                        <RotateCw size={10} style={{color:"#C9A86E"}} />
+                      </div>
+                      {/* خط الربط بين العنصر ومقبض التدوير */}
+                      <div style={{
+                        position:"absolute", top:-20, left:"50%", transform:"translateX(-50%)",
+                        width:1, height:14, background:"#C9A86E", zIndex:19, pointerEvents:"none",
+                      }} />
+                    </>
+                  )}
                 </motion.div>
               );
             })}
-              </div>
             </div>
-            {/* Print Area Guide — always visible */}
-	            <div style={{
-	              position:"absolute",
-	              top: `${activePrintArea.top}%`, left: `${activePrintArea.left}%`,
-	              width: `${activePrintArea.width}%`, height: `${activePrintArea.height}%`,
-	              border:"2px dashed #C9A86E",
-	              borderRadius:4, opacity:0.5, pointerEvents:"none", zIndex:1,
-                display:"flex", alignItems:"center", justifyContent:"center",
-              }}>
-                <span style={{color:"#C9A86E", fontSize:10, background:"#F5F5F0", padding:"2px 6px", borderRadius:4}}>منطقة الطباعة</span>
-              </div>
 
-	            {/* Product Image / SVG */}
+            {/* Print Area Guide — always visible */}
+            <div style={{
+              position:"absolute",
+              top: `${activePrintArea.top}%`, left: `${activePrintArea.left}%`,
+              width: `${activePrintArea.width}%`, height: `${activePrintArea.height}%`,
+              border:"2px dashed #C9A86E",
+              borderRadius:4, opacity:0.5, pointerEvents:"none", zIndex:1,
+              display:"flex", alignItems:"center", justifyContent:"center",
+            }}>
+              <span style={{color:"#C9A86E", fontSize:10, background:"#F5F5F0", padding:"2px 6px", borderRadius:4}}>منطقة الطباعة</span>
+            </div>
+
+            {/* Product Image / SVG */}
             {currentImage ? (
               <img src={currentImage} style={{ width: '100%', height: '100%', objectFit: 'contain' }} alt="Product" />
             ) : (
@@ -1669,6 +1925,132 @@ export default function CustomizePage() {
           )}
         </>
       )}
+
+      {/* ═══ قائمة السياق (كليك يمين / ضغط مطوّل) مثل customink ═══ */}
+      <AnimatePresence>
+        {contextMenu && (() => {
+          const cmEl = elements.find(e => e.id === contextMenu.id) as SafeElement | undefined;
+          if (!cmEl) return null;
+          // ضبط الموقع لمنع خروج القائمة من الشاشة
+          const menuW = isMobile ? 200 : 220;
+          const menuH = isMobile ? 380 : 420;
+          const adjustedX = Math.min(contextMenu.x, window.innerWidth - menuW - 8);
+          const adjustedY = Math.min(contextMenu.y, window.innerHeight - menuH - 8);
+          return (
+            <>
+              {/* خلفية معتمة */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setContextMenu(null)}
+                onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+                style={{ position:"fixed", inset:0, zIndex:100, background:"rgba(0,0,0,0.15)" }}
+              />
+              {/* القائمة نفسها */}
+              <motion.div
+                initial={{ opacity:0, scale:0.92, y: -4 }}
+                animate={{ opacity:1, scale:1, y:0 }}
+                exit={{ opacity:0, scale:0.92, y:-4 }}
+                transition={{ duration:0.15, ease:"easeOut" }}
+                dir="rtl"
+                style={{
+                  position:"fixed",
+                  left: adjustedX, top: adjustedY,
+                  zIndex:101,
+                  background:"#FFFFFF",
+                  border:"1px solid #E5E7EB",
+                  borderRadius:14,
+                  boxShadow:"0 12px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(201,168,110,0.1)",
+                  padding:"6px",
+                  minWidth: menuW,
+                  maxHeight: menuH,
+                  overflowY:"auto",
+                  fontFamily:"Tajawal, sans-serif",
+                }}
+              >
+                {/* رأس القائمة */}
+                <div style={{
+                  padding:"8px 10px 6px",
+                  borderBottom:"1px solid #F3F4F6",
+                  marginBottom:4,
+                  display:"flex", alignItems:"center", gap:8,
+                }}>
+                  <div style={{
+                    width:32, height:32, borderRadius:8,
+                    background:"#FAF9F6", border:"1px solid #E5E7EB",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                  }}>
+                    {cmEl.type === "text" ? <Type size={14} style={{color:"#6B7280"}}/> :
+                     cmEl.type === "sticker" ? <Smile size={14} style={{color:"#6B7280"}}/> :
+                     <Upload size={14} style={{color:"#6B7280"}}/>}
+                  </div>
+                  <div>
+                    <p style={{margin:0, fontSize:12, fontWeight:700, color:"#1A1A1A"}}>
+                      {cmEl.type === "text" ? "عنصر نص" : cmEl.type === "sticker" ? "ستيكر" : "صورة"}
+                    </p>
+                    <p style={{margin:0, fontSize:9, color:"#9CA3AF"}}>
+                      تكبير {Math.round(cmEl.scale * 100)}% · دوران {Math.round(cmEl.rotation)}°
+                    </p>
+                  </div>
+                </div>
+
+                {/* عنصر القائمة */}
+                {([
+                  { label:"نسخ العنصر",       icon:<Copy size={14}/>,        action:() => { duplicateSelected(); setContextMenu(null); }, color:"#1A1A1A" },
+                  { label:"حذف العنصر",       icon:<Trash2 size={14}/>,      action:() => { deleteSelected(); setContextMenu(null); }, color:"#DC2626" },
+                  { divider:true },
+                  { label:"قلب أفقي",         icon:<FlipHorizontal size={14}/>, action:() => { flipSelected(); setContextMenu(null); }, color:"#1A1A1A" },
+                  { label:"تدوير +10°",       icon:<RotateCw size={14}/>,     action:() => { rotateSelected(10); setContextMenu(null); }, color:"#1A1A1A" },
+                  { label:"تدوير -10°",       icon:<RotateCcw size={14}/>,    action:() => { rotateSelected(-10); setContextMenu(null); }, color:"#1A1A1A" },
+                  { divider:true },
+                  { label:"تكبير أكبر",       icon:<ZoomIn size={14}/>,       action:() => { scaleSelected(0.1); setContextMenu(null); }, color:"#1A1A1A" },
+                  { label:"تصغير أصغر",       icon:<ZoomOut size={14}/>,     action:() => { scaleSelected(-0.1); setContextMenu(null); }, color:"#1A1A1A" },
+                  { divider:true },
+                  { label:"نقل للأمام",       icon:<ChevronsUp size={14}/>,   action:() => { bringToFront(); setContextMenu(null); }, color:"#1A1A1A" },
+                  { label:"نقل للخلف",       icon:<ChevronsDown size={14}/>, action:() => { sendToBack(); setContextMenu(null); }, color:"#1A1A1A" },
+                  { label:"توسيط في المنطقة", icon:<Crosshair size={14}/>,   action:() => { centerSelected(); setContextMenu(null); }, color:"#1A1A1A" },
+                ] as any[]).map((item, i) => {
+                  if (item.divider) return <div key={i} style={{ height:1, background:"#F3F4F6", margin:"4px 8px" }} />;
+                  return (
+                    <button
+                      key={i}
+                      onClick={item.action}
+                      style={{
+                        display:"flex", alignItems:"center", gap:10,
+                        padding:"9px 10px",
+                        borderRadius:10,
+                        border:"none",
+                        background:"transparent",
+                        cursor:"pointer",
+                        width:"100%",
+                        textAlign:"right",
+                        fontFamily:"Tajawal, sans-serif",
+                        fontSize: isMobile ? 12 : 12,
+                        fontWeight:600,
+                        color: item.color,
+                        transition:"background 0.1s",
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#FAF9F6"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    >
+                      <span style={{
+                        width:28, height:28, borderRadius:7,
+                        background: item.color === "#DC2626" ? "#FEF2F2" : "#F3F4F6",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        flexShrink:0,
+                      }}>
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </motion.div>
+            </>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* ═══ Product Catalog Modal ═══ */}
       {catalogOpen && (
