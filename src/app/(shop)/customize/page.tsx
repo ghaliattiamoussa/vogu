@@ -186,6 +186,7 @@ const iconBtn: React.CSSProperties = {
   background:"#FFFFFF", border:"1px solid #E5E7EB",
   display:"flex", alignItems:"center", justifyContent:"center",
   color:"#6B7280", cursor:"pointer",
+  transition:"all 0.2s ease",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -256,7 +257,7 @@ export default function CustomizePage() {
 
   const [textTool, setTextTool] = useState<TextToolState>(createDefaultTextToolState);
   const [aiPrompt, setAiPrompt] = useState("");
-  const [aiPanelOpen, setAiPanelOpen] = useState(!isMobile);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const dragging  = useRef<{ id:string; ox:number; oy:number } | null>(null);
@@ -785,7 +786,7 @@ export default function CustomizePage() {
     const el = elements.find((e) => e.id === selected);
     if (el?.type === "text") {
       setTextTool(textToolStateFromElement(el));
-      setTool("text");
+      // لا نفتح أداة النص تلقائياً — الخصائص تظهر في الجهة اليمنى
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
@@ -871,53 +872,71 @@ export default function CustomizePage() {
       {/* ═══ Header ═══ */}
       <div style={{
         borderBottom:"1px solid #E5E7EB",
-        padding: isMobile ? "8px 12px" : "12px 20px",
+        padding: isMobile ? "8px 12px" : "10px 20px",
         display:"flex", alignItems:"center", justifyContent:"space-between",
         background:"#FFFFFF", boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
         flexWrap: isMobile ? "wrap" : "nowrap",
         gap: isMobile ? 8 : 0,
       }}>
-        <div>
-          <p style={{ fontSize: isMobile ? 8 : 9, color:"#C9A86E", letterSpacing:"0.3em", marginBottom:1 }}>VŌGU CUSTOM</p>
-          <h1 style={{ fontFamily:"'Cormorant Garant', serif", fontSize: isMobile ? 16 : 22, fontWeight:400, color:"#1A1A1A" }}>
-            مصمّم الأزياء الشخصي
-          </h1>
+        <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 8 : 14 }}>
+          <button onClick={handleExitCustomizer} style={{
+            display:"flex", alignItems:"center", justifyContent:"center", gap:5,
+            background:"#FAF9F6", border:"1px solid #E5E7EB", color:"#6B7280",
+            padding: isMobile ? "7px 10px" : "8px 14px", borderRadius:10,
+            fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 12, cursor:"pointer",
+            transition:"all 0.2s", minWidth: isMobile ? 34 : undefined,
+          }}>
+            {isMobile ? <span style={{fontSize:16}}>→</span> : "رجوع"}
+          </button>
+          <div>
+            <p style={{ fontSize: isMobile ? 7 : 9, color:"#C9A86E", letterSpacing:"0.3em", marginBottom:1 }}>VŌGU CUSTOM</p>
+            <h1 style={{ fontFamily:"'Cormorant Garant', serif", fontSize: isMobile ? 15 : 20, fontWeight:400, color:"#1A1A1A", lineHeight:1.2 }}>
+              مصمّم الأزياء الشخصي
+            </h1>
+          </div>
         </div>
 
         <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 6 : 8, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-          <button onClick={handleExitCustomizer} style={{
-            display:"flex", alignItems:"center", gap:5, background:"#FAF9F6",
-            border:"1px solid #E5E7EB", color:"#6B7280", padding: isMobile ? "7px 10px" : "8px 14px", borderRadius:10,
+          {/* زر تغيير المنتج — بدلاً من شريط الأمامي/الخلفي */}
+          <button onClick={() => setCatalogOpen(true)} style={{
+            display:"flex", alignItems:"center", gap:5,
+            background:"#FAF9F6", border:"1px solid #E5E7EB", color:"#1A1A1A",
+            padding: isMobile ? "7px 10px" : "8px 14px", borderRadius:10,
             fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 12, cursor:"pointer",
+            transition:"all 0.2s",
           }}>
-            {isMobile ? "→" : "رجوع"}
+            🔄 {isMobile ? "المنتج" : "تغيير المنتج"}
           </button>
 
-          <div style={{ display:"flex", background:"#FAF9F6", border:"1px solid #E5E7EB", borderRadius:9, overflow:"hidden" }}>
-            {DESIGN_VIEWS.map(v => (
-              <button key={v} onClick={() => { setView(v); setSelected(null); }} style={{
-                padding: isMobile ? "6px 10px" : "7px 16px", background: view===v ? "#C9A86E" : "none",
-                color: view===v ? "#FFFFFF" : "#6B7280", border:"none", cursor:"pointer",
-                fontSize: isMobile ? 10 : 12, fontFamily:"Tajawal, sans-serif", fontWeight: view===v ? 700 : 400,
-              }}>{VIEW_LABELS[v]}</button>
-            ))}
-          </div>
+          {/* أزرار تراجع / تقدم */}
+          <button onClick={undo} style={{
+            display:"flex", alignItems:"center", justifyContent:"center",
+            background: histIdx > 0 ? "#FAF9F6" : "#F9FAFB", border:"1px solid #E5E7EB",
+            color: histIdx > 0 ? "#6B7280" : "#D1D5DB",
+            padding: isMobile ? "7px" : "8px 10px", borderRadius:10, cursor: histIdx > 0 ? "pointer" : "default",
+            transition:"all 0.2s",
+          }} disabled={histIdx <= 0}>
+            <RotateCcw size={isMobile ? 13 : 14}/>
+          </button>
+          <button onClick={redo} style={{
+            display:"flex", alignItems:"center", justifyContent:"center",
+            background: histIdx < history.length - 1 ? "#FAF9F6" : "#F9FAFB", border:"1px solid #E5E7EB",
+            color: histIdx < history.length - 1 ? "#6B7280" : "#D1D5DB",
+            padding: isMobile ? "7px" : "8px 10px", borderRadius:10, cursor: histIdx < history.length - 1 ? "pointer" : "default",
+            transition:"all 0.2s",
+          }} disabled={histIdx >= history.length - 1}>
+            <RotateCw size={isMobile ? 13 : 14}/>
+          </button>
 
-	          {!isMobile && (
-            <div style={{
-              background:"#FAF9F6", border:"1px solid #E5E7EB", borderRadius:10, padding:"7px 12px",
-              color:"#1A1A1A", fontFamily:"Tajawal, sans-serif", fontSize:12, fontWeight:700,
-            }}>
-              السعر: <span style={{ color:"#A8823C" }}>{liveTotalPrice.toLocaleString("ar-EG")} ج.م</span>
-            </div>
-          )}
-
+          {/* زر إضافة للسلة بدلاً من السعر */}
           <button onClick={handleAddToCart} style={{
             display:"flex", alignItems:"center", gap:5,
             background:"linear-gradient(135deg, #C9A86E, #9A7848)",
-            color:"#FFFFFF", border:"none", padding: isMobile ? "7px 12px" : "9px 18px", borderRadius:10,
-            fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 13,
+            color:"#FFFFFF", border:"none",
+            padding: isMobile ? "7px 12px" : "8px 18px", borderRadius:10,
+            fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 12,
             cursor:"pointer", boxShadow:"0 4px 16px #C9A86E30",
+            transition:"all 0.25s",
           }}>
             <ShoppingBag size={isMobile ? 13 : 14}/>
             {isMobile
@@ -941,7 +960,7 @@ export default function CustomizePage() {
               width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               background: "#FAF9F6", border: "1px solid #E5E7EB", borderRadius: 10,
               padding: "9px 12px", color: "#1A1A1A", fontSize: 12, fontFamily: "Tajawal, sans-serif",
-              fontWeight: 600, cursor: "pointer",
+              fontWeight: 600, cursor: "pointer", transition:"all 0.2s ease",
             }}>🔄 تغيير المنتج</button>
 
             <Section title="المقاس">
@@ -953,6 +972,7 @@ export default function CustomizePage() {
                     border:`1px solid ${size===s ? "#1A1A1A" : "#E5E7EB"}`,
                     color: size===s ? "#FFFFFF" : "#6B7280",
                     fontSize:11, fontFamily:"Tajawal, sans-serif", fontWeight: size===s ? 700 : 400,
+                    transition:"all 0.2s ease",
                   }}>{s}</button>
                 ))}
               </div>
@@ -991,6 +1011,7 @@ export default function CustomizePage() {
                     border:`1px solid ${tool===v ? "#1A1A1A" : "#E5E7EB"}`,
                     color: tool===v ? "#FFFFFF" : "#6B7280",
                     fontSize:11, fontFamily:"Tajawal, sans-serif", fontWeight: tool===v ? 600 : 400,
+                    transition:"all 0.2s ease",
                   }}>{icon}{l}</button>
                 ))}
               </div>
@@ -1239,6 +1260,7 @@ export default function CustomizePage() {
                   width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:5,
                   border:"1px solid #FCA5A5", borderRadius:9, background:"#FFF5F5", padding:"8px",
                   color:"#DC2626", fontSize:12, fontFamily:"Tajawal, sans-serif", cursor:"pointer",
+                  transition:"all 0.2s ease",
                 }}>
                   <Trash2 size={12}/> حذف العنصر
                 </button>
@@ -1442,14 +1464,108 @@ export default function CustomizePage() {
           </div>
         </div>
 
-        {/* ═══ Right Panel: View Thumbnails — desktop only ═══ */}
+        {/* ═══ Right Panel: Properties + View Thumbnails — desktop only ═══ */}
         {!isMobile && (
         <div style={{
-          width:120, background:"#FFFFFF", borderRight:"1px solid #E5E7EB",
+          width:200, background:"#FFFFFF", borderRight:"1px solid #E5E7EB",
           padding:14, display:"flex", flexDirection:"column", gap:10,
           flexShrink:0, overflowY:"auto",
         }}>
-          <p style={{ fontSize:9, color:"#9CA3AF", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4, fontFamily:"Tajawal, sans-serif" }}>المعاينة</p>
+          {/* ═══ خصائص العنصر المحدد ═══ */}
+          <AnimatePresence>
+          {selectedEl && (
+            <motion.div
+              key="props"
+              initial={{ opacity:0, x:20 }}
+              animate={{ opacity:1, x:0 }}
+              exit={{ opacity:0, x:20 }}
+              transition={{ duration:0.2 }}
+              style={{ display:"flex", flexDirection:"column", gap:8 }}
+            >
+              <p style={{ fontSize:10, color:"#C9A86E", fontWeight:700, fontFamily:"Tajawal, sans-serif", letterSpacing:"0.05em" }}>
+                ✏️ خصائص العنصر
+              </p>
+
+              {/* لون الاستيكر */}
+              {selectedEl.type === "sticker" && (
+                <div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:4 }}>
+                    {TEXT_COLORS_EXTENDED.slice(0,10).map(c => (
+                      <button key={c} onClick={() => {
+                        setElements(prev => prev.map(el => el.id === selected ? { ...el, color: c } : el));
+                      }} style={{
+                        aspectRatio:"1", borderRadius:"50%", background:c, border:"none", cursor:"pointer",
+                        outline: selectedEl.color === c ? "2px solid #C9A86E" : "1.5px solid #E5E7EB",
+                        outlineOffset:1, transition:"all 0.15s",
+                        transform: selectedEl.color === c ? "scale(1.15)" : "scale(1)",
+                      }}/>
+                    ))}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6 }}>
+                    <input type="color" value={selectedEl.color || "#1A1A1A"} onChange={(e) => {
+                      setElements(prev => prev.map(el => el.id === selected ? { ...el, color: e.target.value } : el));
+                    }} style={{ width:32, height:26, border:"1px solid #E5E7EB", borderRadius:6, cursor:"pointer", padding:1 }}/>
+                    <span style={{ fontSize:9, color:"#9CA3AF", fontFamily:"Tajawal, sans-serif" }}>لون مخصص</span>
+                  </div>
+                </div>
+              )}
+
+              {/* التكبير */}
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <button onClick={() => scaleSelected(-0.05)} style={{...iconBtn, transition:"all 0.15s"}}><Minus size={12}/></button>
+                <span style={{ flex:1, textAlign:"center", fontSize:10, color:"#6B7280", fontFamily:"Tajawal, sans-serif" }}>
+                  {Math.round(selectedEl.scale * 100)}%
+                </span>
+                <button onClick={() => scaleSelected(0.05)} style={{...iconBtn, transition:"all 0.15s"}}><Plus size={12}/></button>
+              </div>
+
+              {/* الشفافية — للاستيكر */}
+              {selectedEl.type === "sticker" && (
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:9, color:"#9CA3AF", fontFamily:"Tajawal, sans-serif" }}>شفافية</span>
+                  <input type="range" min={0.1} max={1} step={0.05} value={selectedEl.opacity ?? 1} onChange={(e) => {
+                    setElements(prev => prev.map(el => el.id === selected ? { ...el, opacity: Number(e.target.value) } : el));
+                  }} style={{ flex:1, accentColor:"#C9A86E" }}/>
+                  <span style={{ fontSize:9, color:"#6B7280" }}>{Math.round((selectedEl.opacity ?? 1) * 100)}%</span>
+                </div>
+              )}
+
+              {/* التدوير */}
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <button onClick={() => rotateSelected(-10)} style={{...iconBtn, transition:"all 0.15s"}}><RotateCcw size={12}/></button>
+                <span style={{ flex:1, textAlign:"center", fontSize:10, color:"#6B7280", fontFamily:"Tajawal, sans-serif" }}>
+                  {Math.round(selectedEl.rotation)}°
+                </span>
+                <button onClick={() => rotateSelected(10)} style={{...iconBtn, transition:"all 0.15s"}}><RotateCw size={12}/></button>
+              </div>
+
+              {/* أزرار الإجراءات */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:5 }}>
+                <button onClick={flipSelected} style={{...iconBtn, width:"100%", fontSize:10, fontFamily:"Tajawal, sans-serif", padding:"7px 4px", transition:"all 0.15s"}}>Flip</button>
+                <button onClick={duplicateSelected} style={{...iconBtn, width:"100%", fontSize:10, fontFamily:"Tajawal, sans-serif", padding:"7px 4px", transition:"all 0.15s"}}>نسخ</button>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:5 }}>
+                <button onClick={bringToFront} style={{...iconBtn, width:"100%", fontSize:10, fontFamily:"Tajawal, sans-serif", padding:"7px 4px", transition:"all 0.15s"}}>أمام</button>
+                <button onClick={sendToBack} style={{...iconBtn, width:"100%", fontSize:10, fontFamily:"Tajawal, sans-serif", padding:"7px 4px", transition:"all 0.15s"}}>خلف</button>
+              </div>
+              <button onClick={centerSelected} style={{...iconBtn, width:"100%", fontSize:10, fontFamily:"Tajawal, sans-serif", padding:"7px 4px", transition:"all 0.15s"}}>
+                <Crosshair size={10}/> توسيط
+              </button>
+              <button onClick={deleteSelected} style={{
+                width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:4,
+                border:"1px solid #FCA5A5", borderRadius:8, background:"#FFF5F5", padding:"7px",
+                color:"#DC2626", fontSize:11, fontFamily:"Tajawal, sans-serif", cursor:"pointer",
+                transition:"all 0.15s",
+              }}>
+                <Trash2 size={11}/> حذف
+              </button>
+
+              <div style={{ height:1, background:"#E5E7EB", margin:"2px 0" }}/>
+            </motion.div>
+          )}
+          </AnimatePresence>
+
+          <p style={{ fontSize:9, color:"#9CA3AF", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:2, fontFamily:"Tajawal, sans-serif" }}>المعاينة</p>
 
           {DESIGN_VIEWS.map(v => {
             const hasElements = (designByView[v] ?? []).length > 0;
@@ -1460,12 +1576,13 @@ export default function CustomizePage() {
                 style={{
                   background: view===v ? "#FEF3C7" : "#FAF9F6",
                   border: view===v ? "1.5px solid #C9A86E" : "1px solid #E5E7EB",
-                  borderRadius:8, padding:6, cursor:"pointer",
-                  display:"flex", flexDirection:"column", alignItems:"center", gap:4,
-                  transition:"all 0.15s", position:"relative",
+                  borderRadius:8, padding:5, cursor:"pointer",
+                  display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+                  transition:"all 0.2s", position:"relative",
+                  transform: view===v ? "scale(1.03)" : "scale(1)",
                 }}
               >
-                <div style={{ width:80, height:100, position:"relative" }}>
+                <div style={{ width:72, height:90, position:"relative" }}>
                   {viewThumbImage(v) ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={viewThumbImage(v)!} alt={v} style={{ width:"100%", height:"100%", objectFit:"contain" }} />
@@ -1487,26 +1604,13 @@ export default function CustomizePage() {
             );
           })}
 
-          <div style={{ height:1, background:"#E5E7EB", margin:"4px 0" }}/>
-
-          <p style={{ fontSize:9, color:"#9CA3AF", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:4, fontFamily:"Tajawal, sans-serif" }}>إجراءات</p>
-
-          <button onClick={undo} style={{
-            width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:4,
-            background:"#FAF9F6", border:"1px solid #E5E7EB", borderRadius:8,
-            padding:"8px", color:"#6B7280", fontSize:11, fontFamily:"Tajawal, sans-serif", cursor:"pointer",
-          }}><RotateCcw size={12}/> تراجع</button>
-
-          <button onClick={redo} style={{
-            width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:4,
-            background:"#FAF9F6", border:"1px solid #E5E7EB", borderRadius:8,
-            padding:"8px", color:"#6B7280", fontSize:11, fontFamily:"Tajawal, sans-serif", cursor:"pointer",
-          }}><RotateCw size={12}/> إعادة</button>
+          <div style={{ height:1, background:"#E5E7EB", margin:"2px 0" }}/>
 
           <button onClick={clearAll} style={{
             width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:4,
             background:"#FFF5F5", border:"1px solid #FCA5A5", borderRadius:8,
             padding:"8px", color:"#DC2626", fontSize:11, fontFamily:"Tajawal, sans-serif", cursor:"pointer",
+            transition:"all 0.2s",
           }}><Trash2 size={12}/> مسح الكل</button>
 
           <div style={{ flex:1 }}/>
@@ -1540,14 +1644,18 @@ export default function CustomizePage() {
             {DESIGN_VIEWS.map(v => {
               const hasElements = (designByView[v] ?? []).length > 0;
               return (
-                <button
+                <motion.button
                   key={v}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
                   onClick={() => { setView(v); setSelected(null); }}
                   style={{
                     flexShrink: 0, background: view===v ? "#FEF3C7" : "#FAF9F6",
                     border: view===v ? "1.5px solid #C9A86E" : "1px solid #E5E7EB",
                     borderRadius: 7, padding: "3px 8px", cursor: "pointer",
                     display: "flex", alignItems: "center", gap: 4, position: "relative",
+                    transform: view===v ? "scale(1.04)" : "scale(1)",
+                    transition: "all 0.2s ease",
                   }}
                 >
                   <div style={{ width: 22, height: 28, position: "relative" }}>
@@ -1563,7 +1671,7 @@ export default function CustomizePage() {
                   {hasElements && (
                     <span style={{ position:"absolute", top:2, right:2, width:6, height:6, borderRadius:"50%", background:"#C9A86E" }} />
                   )}
-                </button>
+                </motion.button>
               );
             })}
             {/* عرض السعر في الشريط */}
@@ -1592,8 +1700,11 @@ export default function CustomizePage() {
               { key: "upload",  label: "صورة",  icon: <Upload size={16}/>, active: tool==="upload" },
               { key: "ai",      label: "AI",    icon: <Sparkles size={16}/>, active: tool==="ai" },
             ] as const).map((item) => (
-              <button
+              <motion.button
                 key={item.key}
+                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
                 onClick={() => {
                   const k = item.key;
                   if (k === "text" || k === "sticker" || k === "upload" || k === "ai") {
@@ -1612,12 +1723,12 @@ export default function CustomizePage() {
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                   gap: 2, padding: "4px 8px", minWidth: 46, minHeight: 44,
                   fontFamily: "Tajawal, sans-serif", fontSize: 9, fontWeight: item.active ? 700 : 500,
-                  transition: "all 0.15s",
+                  transition: "all 0.2s ease",
                 }}
               >
                 {item.icon}
                 {item.label}
-              </button>
+              </motion.button>
             ))}
           </div>
 
@@ -1909,7 +2020,12 @@ export default function CustomizePage() {
 
           {/* ── زر عائم: خصائص العنصر المحدد ── */}
           {selectedEl && !bottomSheetOpen && (
-            <button
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 10 }}
+              whileTap={{ scale: 0.92 }}
+              transition={{ type: "spring", stiffness: 350, damping: 20 }}
               onClick={() => { setBottomSheetContent("selected"); setBottomSheetOpen(true); }}
               style={{
                 position: "fixed", bottom: 124, left: 12, zIndex: 45,
@@ -1921,7 +2037,7 @@ export default function CustomizePage() {
               }}
             >
               <Sparkles size={13}/> خصائص
-            </button>
+            </motion.button>
           )}
         </>
       )}
