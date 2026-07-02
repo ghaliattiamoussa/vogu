@@ -432,28 +432,32 @@ model CustomizerCategory {
 }
 
 model CustomizerProduct {
-  id               String   @id @default(cuid())
-  label            String
-  categoryId       String
-  svgType          String   @default("tshirt") // tshirt, hoodie, polo, cap, etc.
-  frontImage       String?  // رابط صورة الأمام
-  backImage        String?  // رابط صورة الخلفية
-  rightSleeveImage String?  // رابط صورة كم يمين
-  leftSleeveImage  String?  // رابط صورة كم شمال
-  defaultColor     String   @default("#F5F5F0")
-  sizes            String[] @default(["XS","S","M","L","XL","XXL"])
-  colors           Json?    // [{ name: "أبيض", hex: "#F5F5F0" }, ...]
-  printArea        Json?    // { top: 24, left: 24, width: 52, height: 46 }
-  price            Float    @default(299)
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+	  id               String   @id @default(cuid())
+	  label            String
+	  categoryId       String
+	  svgType          String   @default("tshirt") // tshirt, hoodie, polo, cap, etc.
+	  frontImage       String?  // رابط صورة الأمام
+	  backImage        String?  // رابط صورة الخلفية
+	  rightSleeveImage String?  // رابط صورة كم يمين
+	  leftSleeveImage  String?  // رابط صورة كم شمال
+	  defaultColor     String   @default("#F5F5F0")
+	  sizes            String[] @default(["XS","S","M","L","XL","XXL"])
+	  colors           Json?    // [{ name: "أبيض", hex: "#F5F5F0" }, ...]
+	  printArea        Json?    // { top: 24, left: 24, width: 52, height: 46 } — منطقة الطباعة الرئيسية (قدام)
+	  frontPrintArea   Json?    // منطقة طباعة الجانب الأمامي
+	  backPrintArea    Json?    // منطقة طباعة الجانب الخلفي
+	  rightSleevePrintArea Json? // منطقة طباعة كم اليمين
+	  leftSleevePrintArea  Json? // منطقة طباعة كم الشمال
+	  price            Float    @default(299)
+	  isActive         Boolean  @default(true)
+	  sortOrder        Int      @default(0)
+	  createdAt        DateTime @default(now())
+	  updatedAt        DateTime @updatedAt
 
-  category CustomizerCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+	  category CustomizerCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  @@map("customizer_products")
-}
+	  @@map("customizer_products")
+	}
 
 // ─────────────────────────────────────────────────────────
 //  SUPPORT TICKETS (الشكاوي والدعم الفني)

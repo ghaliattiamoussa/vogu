@@ -8,28 +8,34 @@
 export interface CustomColor { name: string; hex: string }
 
 export interface CatalogProductFull {
-  id: string;
-  label: string;
-  categoryId: string;
-  categoryLabel?: string;
-  categoryEmoji?: string;
-  svgType: string;
-  price: number;
-  sizes: string[];
-  colors: CustomColor[];
-  defaultColor: string;
-  printArea: { top: number; left: number; width: number; height: number };
-  // الجوانب الأربعة — صورة حقيقية أو null
-  frontImage?: string | null;
-  backImage?: string | null;
-  rightSleeveImage?: string | null;
-  leftSleeveImage?: string | null;
-  // دوال رسم SVG fallback (لو مفيش صورة)
-  frontSvg: (color: string) => string;
-  backSvg: (color: string) => string;
-  rightSleeveSvg: (color: string) => string;
-  leftSleeveSvg: (color: string) => string;
-}
+	  id: string;
+	  label: string;
+	  categoryId: string;
+	  categoryLabel?: string;
+	  categoryEmoji?: string;
+	  svgType: string;
+	  price: number;
+	  sizes: string[];
+	  colors: CustomColor[];
+	  defaultColor: string;
+	  // منطقة طباعة رئيسية (قدام) — للتوافق مع القديم
+	  printArea: { top: number; left: number; width: number; height: number };
+	  // مناطق طباعة لكل جانب
+	  frontPrintArea: { top: number; left: number; width: number; height: number };
+	  backPrintArea: { top: number; left: number; width: number; height: number };
+	  rightSleevePrintArea: { top: number; left: number; width: number; height: number };
+	  leftSleevePrintArea: { top: number; left: number; width: number; height: number };
+	  // الجوانب الأربعة — صورة حقيقية أو null
+	  frontImage?: string | null;
+	  backImage?: string | null;
+	  rightSleeveImage?: string | null;
+	  leftSleeveImage?: string | null;
+	  // دوال رسم SVG fallback (لو مفيش صورة)
+	  frontSvg: (color: string) => string;
+	  backSvg: (color: string) => string;
+	  rightSleeveSvg: (color: string) => string;
+	  leftSleeveSvg: (color: string) => string;
+	}
 
 // ─── لوحة ألوان احترافية موسّعة (38 لون) ────────────────────
 export const PRODUCT_COLORS_EXTENDED: CustomColor[] = [
@@ -54,21 +60,31 @@ export const PRODUCT_COLORS_EXTENDED: CustomColor[] = [
   { name: "ذهبي",        hex: "#C9A86E" }, { name: "فضي",          hex: "#94A3B8" },
 ];
 
+// ─── مناطق طباعة افتراضية لكل جانب ─────────────────────────
+const DEFAULT_FRONT_PRINT_AREA  = { top: 24, left: 24, width: 52, height: 46 };
+const DEFAULT_BACK_PRINT_AREA   = { top: 24, left: 24, width: 52, height: 46 };
+const DEFAULT_RIGHT_SLEEVE_PRINT_AREA = { top: 28, left: 69, width: 17, height: 26 };
+const DEFAULT_LEFT_SLEEVE_PRINT_AREA  = { top: 28, left: 14, width: 17, height: 26 };
+
 // ─── منتج افتراضي fallback (لو الـDB فاضي أو فيه خطأ) ─────────
 export const DEFAULT_FALLBACK_PRODUCT: CatalogProductFull = {
-  id: "fallback-tshirt",
-  label: "تيشرت",
-  categoryId: "fallback",
-  svgType: "tshirt",
-  price: 299,
-  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
-  colors: PRODUCT_COLORS_EXTENDED,
-  defaultColor: "#F5F5F0",
-  printArea: { top: 24, left: 24, width: 52, height: 46 },
-  frontImage: null,
-  backImage: null,
-  rightSleeveImage: null,
-  leftSleeveImage: null,
+	  id: "fallback-tshirt",
+	  label: "تيشرت",
+	  categoryId: "fallback",
+	  svgType: "tshirt",
+	  price: 299,
+	  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+	  colors: PRODUCT_COLORS_EXTENDED,
+	  defaultColor: "#F5F5F0",
+	  printArea: DEFAULT_FRONT_PRINT_AREA,
+	  frontPrintArea: DEFAULT_FRONT_PRINT_AREA,
+	  backPrintArea: DEFAULT_BACK_PRINT_AREA,
+	  rightSleevePrintArea: DEFAULT_RIGHT_SLEEVE_PRINT_AREA,
+	  leftSleevePrintArea: DEFAULT_LEFT_SLEEVE_PRINT_AREA,
+	  frontImage: null,
+	  backImage: null,
+	  rightSleeveImage: null,
+	  leftSleeveImage: null,
   frontSvg: (c) => `<svg viewBox="0 0 420 500" xmlns="http://www.w3.org/2000/svg"><path d="M152 40 L88 18 L10 92 L60 142 L94 106 L78 440 L342 440 L326 106 L268 40 C262 68 238 90 210 90 C182 90 158 68 152 40 Z" fill="${c}"/></svg>`,
   backSvg: (c) => `<svg viewBox="0 0 420 500" xmlns="http://www.w3.org/2000/svg"><path d="M152 40 L88 18 L10 92 L60 142 L94 106 L78 440 L342 440 L326 106 L268 40 C262 68 238 86 210 86 C182 86 158 68 152 40 Z" fill="${c}"/></svg>`,
   rightSleeveSvg: (c) => `<svg viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg"><rect x="40" y="20" width="120" height="360" rx="20" fill="${c}"/></svg>`,
@@ -100,9 +116,25 @@ const SLEEVE_SVG = (color: string, side: "right" | "left") => `
 
 // ─── تحويل منتج الـDB إلى تعريف تفصيلي ──────────────────────
 export function resolveCatalogProduct(db: any): CatalogProductFull {
-  const printArea = (db.printArea && typeof db.printArea === "object")
-    ? db.printArea
-    : { top: 24, left: 24, width: 52, height: 46 };
+	  const printArea = (db.printArea && typeof db.printArea === "object")
+	    ? db.printArea
+	    : DEFAULT_FRONT_PRINT_AREA;
+
+	  const frontPrintArea = (db.frontPrintArea && typeof db.frontPrintArea === "object")
+	    ? db.frontPrintArea
+	    : (db.printArea && typeof db.printArea === "object" ? db.printArea : DEFAULT_FRONT_PRINT_AREA);
+
+	  const backPrintArea = (db.backPrintArea && typeof db.backPrintArea === "object")
+	    ? db.backPrintArea
+	    : DEFAULT_BACK_PRINT_AREA;
+
+	  const rightSleevePrintArea = (db.rightSleevePrintArea && typeof db.rightSleevePrintArea === "object")
+	    ? db.rightSleevePrintArea
+	    : DEFAULT_RIGHT_SLEEVE_PRINT_AREA;
+
+	  const leftSleevePrintArea = (db.leftSleevePrintArea && typeof db.leftSleevePrintArea === "object")
+	    ? db.leftSleevePrintArea
+	    : DEFAULT_LEFT_SLEEVE_PRINT_AREA;
 
   const colors: CustomColor[] = Array.isArray(db.colors) && db.colors.length > 0
     ? db.colors
@@ -126,7 +158,11 @@ export function resolveCatalogProduct(db: any): CatalogProductFull {
     sizes,
     colors,
     defaultColor: db.defaultColor || "#F5F5F0",
-    printArea,
+	    printArea,
+	    frontPrintArea,
+	    backPrintArea,
+	    rightSleevePrintArea,
+	    leftSleevePrintArea,
     frontImage: db.frontImage || null,
     backImage: db.backImage || null,
     rightSleeveImage: db.rightSleeveImage || null,

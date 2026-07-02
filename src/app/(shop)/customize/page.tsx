@@ -171,10 +171,12 @@ const VIEW_LABELS: Record<DesignView, string> = {
 };
 
 const getPrintAreaForView = (view: DesignView, product: CatalogProductFull) => {
-  if (view === "rightSleeve") return { top: 28, left: 69, width: 17, height: 26 };
-  if (view === "leftSleeve") return { top: 28, left: 14, width: 17, height: 26 };
-  return product.printArea;
-};
+	  if (view === "front") return product.frontPrintArea;
+	  if (view === "back") return product.backPrintArea;
+	  if (view === "rightSleeve") return product.rightSleevePrintArea;
+	  if (view === "leftSleeve") return product.leftSleevePrintArea;
+	  return product.frontPrintArea;
+	};
 
 // ─── Icon button style ────────────────────────────────────
 const iconBtn: React.CSSProperties = {

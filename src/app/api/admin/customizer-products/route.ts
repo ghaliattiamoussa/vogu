@@ -36,30 +36,35 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { label, categoryId, svgType, frontImage, backImage, rightSleeveImage, leftSleeveImage,
-            defaultColor, sizes, colors, printArea, price, isActive, sortOrder } = body;
+	    const { label, categoryId, svgType, frontImage, backImage, rightSleeveImage, leftSleeveImage,
+	            defaultColor, sizes, colors, printArea, frontPrintArea, backPrintArea,
+	            rightSleevePrintArea, leftSleevePrintArea, price, isActive, sortOrder } = body;
 
-    if (!label || !categoryId) {
-      return NextResponse.json({ error: 'الاسم والقسم مطلوبان' }, { status: 400 });
-    }
+	    if (!label || !categoryId) {
+	      return NextResponse.json({ error: 'الاسم والقسم مطلوبان' }, { status: 400 });
+	    }
 
-    const product = await prisma.customizerProduct.create({
-      data: {
-        label,
-        categoryId,
-        svgType: svgType || 'tshirt',
-        frontImage: frontImage || null,
-        backImage: backImage || null,
-        rightSleeveImage: rightSleeveImage || null,
-        leftSleeveImage: leftSleeveImage || null,
-        defaultColor: defaultColor || '#F5F5F0',
-        sizes: sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
-        colors: colors || null,
-        printArea: printArea || null,
-        price: price || 299,
-        isActive: isActive !== undefined ? isActive : true,
-        sortOrder: sortOrder || 0,
-      },
+	    const product = await prisma.customizerProduct.create({
+	      data: {
+	        label,
+	        categoryId,
+	        svgType: svgType || 'tshirt',
+	        frontImage: frontImage || null,
+	        backImage: backImage || null,
+	        rightSleeveImage: rightSleeveImage || null,
+	        leftSleeveImage: leftSleeveImage || null,
+	        defaultColor: defaultColor || '#F5F5F0',
+	        sizes: sizes || ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+	        colors: colors || null,
+	        printArea: printArea || null,
+	        frontPrintArea: frontPrintArea || null,
+	        backPrintArea: backPrintArea || null,
+	        rightSleevePrintArea: rightSleevePrintArea || null,
+	        leftSleevePrintArea: leftSleevePrintArea || null,
+	        price: price || 299,
+	        isActive: isActive !== undefined ? isActive : true,
+	        sortOrder: sortOrder || 0,
+	      },
       include: { category: true },
     });
 

@@ -293,6 +293,163 @@ function ProductCard({ product, onClick }: { product: CustomizerProduct; onClick
   );
 }
 
+// ─── Print Area Visual Editor ───────────────────────────────
+function PrintAreaVisualEditor({
+  sideKey,
+  value,
+  onChange,
+  imageUrl,
+}: {
+  sideKey: "front" | "back" | "rightSleeve" | "leftSleeve";
+  value: PrintArea;
+  onChange: (v: PrintArea) => void;
+  imageUrl: string | null | undefined;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef<"move" | "resize-tl" | "resize-tr" | "resize-bl" | "resize-br" | null>(null);
+  const dragStart = useRef<{ mx: number; my: number; area: PrintArea } | null>(null);
+
+  const PREVIEW_W = 320;
+  const PREVIEW_H = sideKey === "rightSleeve" || sideKey === "leftSleeve" ? 280 : 400;
+
+  const onPointerDown = (e: React.PointerEvent, mode: "move" | "resize-tl" | "resize-tr" | "resize-bl" | "resize-br") => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragging.current = mode;
+    dragStart.current = { mx: e.clientX, my: e.clientY, area: { ...value } };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging.current || !dragStart.current) return;
+    const dx = e.clientX - dragStart.current.mx;
+    const dy = e.clientY - dragStart.current.my;
+    const start = dragStart.current.area;
+    const pxToPct_x = (dx / PREVIEW_W) * 100;
+    const pxToPct_y = (dy / PREVIEW_H) * 100;
+    let next = { ...start };
+
+    if (dragging.current === "move") {
+      next.left = Math.max(0, Math.min(100 - start.width, start.left + pxToPct_x));
+      next.top = Math.max(0, Math.min(100 - start.height, start.top + pxToPct_y));
+    } else if (dragging.current === "resize-br") {
+      next.width = Math.max(5, Math.min(100 - start.left, start.width + pxToPct_x));
+      next.height = Math.max(5, Math.min(100 - start.top, start.height + pxToPct_y));
+    } else if (dragging.current === "resize-bl") {
+      const newW = Math.max(5, Math.min(100 - start.left, start.width - pxToPct_x));
+      next.left = start.left + (start.width - newW);
+      next.width = newW;
+      next.height = Math.max(5, Math.min(100 - start.top, start.height + pxToPct_y));
+    } else if (dragging.current === "resize-tr") {
+      next.width = Math.max(5, Math.min(100 - start.left, start.width + pxToPct_x));
+      const newH = Math.max(5, Math.min(100 - start.top, start.height - pxToPct_y));
+      next.top = start.top + (start.height - newH);
+      next.height = newH;
+    } else if (dragging.current === "resize-tl") {
+      const newW = Math.max(5, Math.min(100 - start.left, start.width - pxToPct_x));
+      const newH = Math.max(5, Math.min(100 - start.top, start.height - pxToPct_y));
+      next.left = start.left + (start.width - newW);
+      next.top = start.top + (start.height - newH);
+      next.width = newW;
+      next.height = newH;
+    }
+
+    // Round to 1 decimal
+    next = { top: Math.round(next.top * 10) / 10, left: Math.round(next.left * 10) / 10, width: Math.round(next.width * 10) / 10, height: Math.round(next.height * 10) / 10 };
+    onChange(next);
+  };
+
+  const onPointerUp = () => {
+    dragging.current = null;
+    dragStart.current = null;
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Visual preview */}
+      <div
+        ref={containerRef}
+        className="relative bg-[#070707] border border-[#1A1A1A] rounded-xl overflow-hidden"
+        style={{ width: PREVIEW_W, height: PREVIEW_H, margin: "0 auto", touchAction: "none" }}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        {/* Product image background */}
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt="Product" className="absolute inset-0 w-full h-full object-contain p-3 pointer-events-none" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-[#1A1A1A]">
+            <span className="font-cormorant text-4xl">VŌGU</span>
+          </div>
+        )}
+
+        {/* Print area rectangle */}
+        <div
+          style={{
+            position: "absolute",
+            top: `${value.top}%`,
+            left: `${value.left}%`,
+            width: `${value.width}%`,
+            height: `${value.height}%`,
+            border: "2px dashed #C9A86E",
+            background: "rgba(201, 168, 110, 0.12)",
+            cursor: "move",
+            zIndex: 10,
+          }}
+          onPointerDown={e => onPointerDown(e, "move")}
+        >
+          {/* Corner resize handles */}
+          {(["tl", "tr", "bl", "br"] as const).map(corner => (
+            <div
+              key={corner}
+              onPointerDown={e => onPointerDown(e, `resize-${corner}`)}
+              style={{
+                position: "absolute",
+                width: 14,
+                height: 14,
+                background: "#C9A86E",
+                border: "2px solid #070707",
+                borderRadius: 3,
+                cursor: corner.includes("r") ? "nwse-resize" : "nesw-resize",
+                zIndex: 11,
+                top: corner.startsWith("t") ? -7 : undefined,
+                bottom: corner.startsWith("b") ? -7 : undefined,
+                left: corner.endsWith("l") ? -7 : undefined,
+                right: corner.endsWith("r") ? -7 : undefined,
+              }}
+            />
+          ))}
+          {/* Label */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-[9px] bg-[#070707]/80 text-[#C9A86E] px-1.5 py-0.5 rounded font-tajawal">
+              {Math.round(value.width)}% × {Math.round(value.height)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Number inputs */}
+      <div className="grid grid-cols-4 gap-2">
+        {(['top', 'left', 'width', 'height'] as const).map(key => (
+          <div key={key} className="bg-[#070707] border border-[#1A1A1A] rounded-lg p-2">
+            <label className="text-[10px] text-[#8A8480] font-tajawal block mb-1">
+              {key === 'top' ? 'من أعلى' : key === 'left' ? 'من اليمين' : key === 'width' ? 'العرض' : 'الارتفاع'}
+            </label>
+            <input
+              type="number"
+              step={0.5}
+              value={value[key]}
+              onChange={e => onChange({ ...value, [key]: Math.max(0, Math.min(100, Number(e.target.value))) })}
+              className="w-full bg-transparent text-[#EDE8DF] text-sm outline-none"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Field wrapper ─────────────────────────────────────────
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -323,6 +480,19 @@ function ProductEditor({
   const [sizes, setSizes] = useState<string[]>(product?.sizes ?? ['XS', 'S', 'M', 'L', 'XL', 'XXL']);
   const [colors, setColors] = useState<CustomColor[]>(product?.colors ?? []);
   const [printArea, setPrintArea] = useState<PrintArea>(product?.printArea ?? { top: 24, left: 24, width: 52, height: 46 });
+  const [frontPrintArea, setFrontPrintArea] = useState<PrintArea>(
+	    (product as any)?.frontPrintArea ?? product?.printArea ?? { top: 24, left: 24, width: 52, height: 46 }
+	  );
+	  const [backPrintArea, setBackPrintArea] = useState<PrintArea>(
+	    (product as any)?.backPrintArea ?? { top: 24, left: 24, width: 52, height: 46 }
+	  );
+	  const [rightSleevePrintArea, setRightSleevePrintArea] = useState<PrintArea>(
+	    (product as any)?.rightSleevePrintArea ?? { top: 28, left: 69, width: 17, height: 26 }
+	  );
+	  const [leftSleevePrintArea, setLeftSleevePrintArea] = useState<PrintArea>(
+	    (product as any)?.leftSleevePrintArea ?? { top: 28, left: 14, width: 17, height: 26 }
+	  );
+	  const [activePrintSide, setActivePrintSide] = useState<"front"|"back"|"rightSleeve"|"leftSleeve">("front");
   const [images, setImages] = useState<Record<string, string | null>>({
     frontImage: product?.frontImage ?? null,
     backImage: product?.backImage ?? null,
@@ -359,13 +529,17 @@ function ProductEditor({
     setSaving(true);
     try {
       const payload = {
-        label, categoryId, svgType, price: Number(price), defaultColor, isActive,
-        sizes, colors, printArea,
-        frontImage: images.frontImage,
-        backImage: images.backImage,
-        rightSleeveImage: images.rightSleeveImage,
-        leftSleeveImage: images.leftSleeveImage,
-      };
+	        label, categoryId, svgType, price: Number(price), defaultColor, isActive,
+	        sizes, colors, printArea,
+	        frontPrintArea,
+	        backPrintArea,
+	        rightSleevePrintArea,
+	        leftSleevePrintArea,
+	        frontImage: images.frontImage,
+	        backImage: images.backImage,
+	        rightSleeveImage: images.rightSleeveImage,
+	        leftSleeveImage: images.leftSleeveImage,
+	      };
 
       const url = isEdit ? `/api/admin/customizer-products/${product!.id}` : '/api/admin/customizer-products';
       const method = isEdit ? 'PATCH' : 'POST';
@@ -625,27 +799,56 @@ function ProductEditor({
                 </div>
               </div>
 
-              {/* Print area */}
-              <div>
-                <p className="text-xs font-tajawal font-bold text-[#EDE8DF] mb-2">
-                  منطقة الطباعة (%) <span className="text-[#8A8480] font-normal">— المنطقة المسموح بطباعة التصميم فيها</span>
-                </p>
-                <div className="grid grid-cols-4 gap-3">
-                  {(['top', 'left', 'width', 'height'] as const).map(key => (
-                    <div key={key} className="bg-[#070707] border border-[#1A1A1A] rounded-lg p-2">
-                      <label className="text-[10px] text-[#8A8480] font-tajawal block mb-1">
-                        {key === 'top' ? 'من أعلى' : key === 'left' ? 'من اليمين' : key === 'width' ? 'العرض' : 'الارتفاع'}
-                      </label>
-                      <input
-                        type="number"
-                        value={printArea[key]}
-                        onChange={e => setPrintArea(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                        className="w-full bg-transparent text-[#EDE8DF] text-sm outline-none"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* ═══ Per-side Print Area Editor ═══ */}
+	              <div>
+	                <p className="text-xs font-tajawal font-bold text-[#EDE8DF] mb-2">
+	                  منطقة الطباعة لكل جانب (%) <span className="text-[#8A8480] font-normal">— حدد لكل صورة منطقتها</span>
+	                </p>
+
+	                {/* Side tabs */}
+	                <div className="flex gap-2 mb-3">
+	                  {([
+	                    { key: "front" as const, label: "قدام" },
+	                    { key: "back" as const, label: "ورا" },
+	                    { key: "rightSleeve" as const, label: "كم يمين" },
+	                    { key: "leftSleeve" as const, label: "كم شمال" },
+	                  ]).map(s => (
+	                    <button
+	                      key={s.key}
+	                      onClick={() => setActivePrintSide(s.key)}
+	                      className={`px-3 py-1.5 rounded-lg text-xs font-tajawal transition ${
+	                        activePrintSide === s.key
+	                          ? 'bg-[#C9A86E] text-[#070707] font-bold'
+	                          : 'bg-[#070707] text-[#8A8480] border border-[#1A1A1A]'
+	                      }`}
+	                    >
+	                      {s.label}
+	                    </button>
+	                  ))}
+	                </div>
+
+	                <PrintAreaVisualEditor
+	                  sideKey={activePrintSide}
+	                  value={
+	                    activePrintSide === "front" ? frontPrintArea :
+	                    activePrintSide === "back" ? backPrintArea :
+	                    activePrintSide === "rightSleeve" ? rightSleevePrintArea :
+	                    leftSleevePrintArea
+	                  }
+	                  onChange={val => {
+	                    if (activePrintSide === "front") { setFrontPrintArea(val); setPrintArea(val); }
+	                    else if (activePrintSide === "back") setBackPrintArea(val);
+	                    else if (activePrintSide === "rightSleeve") setRightSleevePrintArea(val);
+	                    else setLeftSleevePrintArea(val);
+	                  }}
+	                  imageUrl={
+	                    activePrintSide === "front" ? images.frontImage :
+	                    activePrintSide === "back" ? images.backImage :
+	                    activePrintSide === "rightSleeve" ? images.rightSleeveImage :
+	                    images.leftSleeveImage
+	                  }
+	                />
+	              </div>
 
               {/* Active toggle */}
               <label className="flex items-center gap-3 cursor-pointer">

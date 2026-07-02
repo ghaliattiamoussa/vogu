@@ -36,24 +36,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   try {
     const body = await req.json();
-    const { label, categoryId, svgType, frontImage, backImage, rightSleeveImage, leftSleeveImage,
-            defaultColor, sizes, colors, printArea, price, isActive, sortOrder } = body;
+	    const { label, categoryId, svgType, frontImage, backImage, rightSleeveImage, leftSleeveImage,
+	            defaultColor, sizes, colors, printArea, frontPrintArea, backPrintArea,
+	            rightSleevePrintArea, leftSleevePrintArea, price, isActive, sortOrder } = body;
 
-    const updateData: any = {};
-    if (label !== undefined) updateData.label = label;
-    if (categoryId !== undefined) updateData.categoryId = categoryId;
-    if (svgType !== undefined) updateData.svgType = svgType;
-    if (frontImage !== undefined) updateData.frontImage = frontImage;
-    if (backImage !== undefined) updateData.backImage = backImage;
-    if (rightSleeveImage !== undefined) updateData.rightSleeveImage = rightSleeveImage;
-    if (leftSleeveImage !== undefined) updateData.leftSleeveImage = leftSleeveImage;
-    if (defaultColor !== undefined) updateData.defaultColor = defaultColor;
-    if (sizes !== undefined) updateData.sizes = sizes;
-    if (colors !== undefined) updateData.colors = colors;
-    if (printArea !== undefined) updateData.printArea = printArea;
-    if (price !== undefined) updateData.price = price;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+	    const updateData: any = {};
+	    if (label !== undefined) updateData.label = label;
+	    if (categoryId !== undefined) updateData.categoryId = categoryId;
+	    if (svgType !== undefined) updateData.svgType = svgType;
+	    if (frontImage !== undefined) updateData.frontImage = frontImage;
+	    if (backImage !== undefined) updateData.backImage = backImage;
+	    if (rightSleeveImage !== undefined) updateData.rightSleeveImage = rightSleeveImage;
+	    if (leftSleeveImage !== undefined) updateData.leftSleeveImage = leftSleeveImage;
+	    if (defaultColor !== undefined) updateData.defaultColor = defaultColor;
+	    if (sizes !== undefined) updateData.sizes = sizes;
+	    if (colors !== undefined) updateData.colors = colors;
+	    if (printArea !== undefined) updateData.printArea = printArea;
+	    if (frontPrintArea !== undefined) updateData.frontPrintArea = frontPrintArea;
+	    if (backPrintArea !== undefined) updateData.backPrintArea = backPrintArea;
+	    if (rightSleevePrintArea !== undefined) updateData.rightSleevePrintArea = rightSleevePrintArea;
+	    if (leftSleevePrintArea !== undefined) updateData.leftSleevePrintArea = leftSleevePrintArea;
+	    if (price !== undefined) updateData.price = price;
+	    if (isActive !== undefined) updateData.isActive = isActive;
+	    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
 
     const product = await prisma.customizerProduct.update({
       where: { id: params.id },
