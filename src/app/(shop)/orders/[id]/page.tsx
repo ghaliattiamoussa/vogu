@@ -347,7 +347,7 @@ export default function OrderDetailPage() {
                   fontFamily: "Tajawal, sans-serif",
                 }}
               >
-                تم الدفع بنجاح! 🎉
+                تم تاكيد الطلب بنجاح! 🎉
               </p>
               <p
                 style={{
