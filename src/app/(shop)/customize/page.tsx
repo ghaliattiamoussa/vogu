@@ -259,6 +259,8 @@ export default function CustomizePage() {
   const fileInput = useRef<HTMLInputElement>(null);
   const dragging  = useRef<{ id:string; ox:number; oy:number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  // ── refs للتحكم بالبنصرين (pinch-to-zoom) ──
+  const pinchRef = useRef<{ active: boolean; startDist: number; startScale: number; id: string } | null>(null);
   // ── مراجع DOM للعناصر لقياس الأبعاد المعروضة (لاستخدامها في التثبيت داخل منطقة الطباعة) ──
   const elementRefs = useRef<Map<string, HTMLElement>>(new Map());
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -450,11 +452,13 @@ export default function CustomizePage() {
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-	    if (!dragging.current) return;
-	    const { id, ox, oy } = dragging.current;
-	    const nextPos = clampCenterToPrintArea(id, e.clientX - ox, e.clientY - oy);
-	    setElements(prev => prev.map(el => el.id === id ? { ...el, x: nextPos.x, y: nextPos.y } : el ));
-	  };
+		    if (!dragging.current) return;
+		    const { id, ox, oy } = dragging.current;
+		    // حرية الحركة الكاملة — بدون تثبيت (الـ clip layer بتاع منطقة الطباعة بيقفل الجزء الخارج)
+		    const nextX = e.clientX - ox;
+		    const nextY = e.clientY - oy;
+		    setElements(prev => prev.map(el => el.id === id ? { ...el, x: nextX, y: nextY } : el ));
+		  };
 
 	  const onPointerUp = () => {
 	    if (dragging.current) {
@@ -464,17 +468,15 @@ export default function CustomizePage() {
 	  };
 
   const onWheel = useCallback((e: React.WheelEvent) => {
-    if (!selected) return;
-    e.preventDefault();
-	    const delta = e.deltaY > 0 ? -0.04 : 0.04;
-    setElements(prev => prev.map(el => {
-      if (el.id !== selected) return el;
-      const nextScale = Math.max(0.15, Math.min(5, el.scale + delta));
-      // إعادة تثبيت المركز داخل منطقة الطباعة بالاعتماد على scale الجديد
-      const pos = clampCenterToPrintArea(el.id, el.x, el.y, nextScale);
-      return { ...el, scale: nextScale, x: pos.x, y: pos.y };
-    }));
-  }, [selected, setElements]);
+	    if (!selected) return;
+	    e.preventDefault();
+		    const delta = e.deltaY > 0 ? -0.04 : 0.04;
+	    setElements(prev => prev.map(el => {
+	      if (el.id !== selected) return el;
+	      const nextScale = Math.max(0.15, Math.min(5, el.scale + delta));
+	      return { ...el, scale: nextScale };
+	    }));
+	  }, [selected, setElements]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -484,38 +486,36 @@ export default function CustomizePage() {
     reader.readAsDataURL(file);
   };
 
-  // ── تكبير/تدوير/قلب العنصر المحدد مع إعادة تثبيت داخل منطقة الطباعة ──
-  const applyTransform = (id: string, mutate: (el: DesignElement) => Partial<DesignElement>) => {
-    setElements(prev => prev.map(el => {
-      if (el.id !== id) return el;
-      const patch = mutate(el);
-      const merged = { ...el, ...patch };
-      const pos = clampCenterToPrintArea(el.id, merged.x, merged.y, merged.scale);
-      return { ...merged, x: pos.x, y: pos.y };
-    }));
-  };
+  // ── تكبير/تدوير/قلب العنصر المحدد (بدون تثبيت) ──
+	  const applyTransform = (id: string, mutate: (el: DesignElement) => Partial<DesignElement>) => {
+	    setElements(prev => prev.map(el => {
+	      if (el.id !== id) return el;
+	      const patch = mutate(el);
+	      return { ...el, ...patch };
+	    }));
+	  };
 
-  const scaleSelected = (delta: number) => {
-    if (!selected) return;
-    applyTransform(selected, (el) => ({ scale: Math.max(0.15, Math.min(5, el.scale + delta)) }));
-  };
-  const setScaleSelected = (nextScale: number) => {
-    if (!selected) return;
-    applyTransform(selected, () => ({ scale: Math.max(0.15, Math.min(5, nextScale)) }));
-  };
-  const rotateSelected = (deg: number) => {
-    if (!selected) return;
-    applyTransform(selected, (el) => ({ rotation: (el.rotation + deg + 360) % 360 }));
-  };
+	  const scaleSelected = (delta: number) => {
+	    if (!selected) return;
+	    applyTransform(selected, (el) => ({ scale: Math.max(0.15, Math.min(5, el.scale + delta)) }));
+	  };
+	  const setScaleSelected = (nextScale: number) => {
+	    if (!selected) return;
+	    applyTransform(selected, () => ({ scale: Math.max(0.15, Math.min(5, nextScale)) }));
+	  };
+	  const rotateSelected = (deg: number) => {
+	    if (!selected) return;
+	    applyTransform(selected, (el) => ({ rotation: (el.rotation + deg + 360) % 360 }));
+	  };
 
-  /* ✅ flipSelected يستخدم SafeElement عشان يتجنب خطأ TypeScript */
-  const flipSelected = () => {
-    if (!selected) return;
-    applyTransform(selected, (el) => {
-      const safe = el as SafeElement;
-      return { flipX: !safe.flipX } as Partial<DesignElement>;
-    });
-  };
+	  /* ✅ flipSelected يستخدم SafeElement عشان يتجنب خطأ TypeScript */
+	  const flipSelected = () => {
+	    if (!selected) return;
+	    applyTransform(selected, (el) => {
+	      const safe = el as SafeElement;
+	      return { flipX: !safe.flipX } as Partial<DesignElement>;
+	    });
+	  };
 
   const duplicateSelected = () => {
     const el = elements.find(item => item.id === selected);
@@ -1140,34 +1140,19 @@ export default function CustomizePage() {
                     if (node) elementRefs.current.set(el.id, node);
                     else elementRefs.current.delete(el.id);
                   }}
-                  onPointerDown={e => onPointerDown(e, el.id)}
-                  onClick={e => { e.stopPropagation(); setSelected(el.id); }}
-                  animate={selected===el.id ? {
-                    outlineOffset: [0, 2, 0],
-                    boxShadow: [
-                      "0 0 0 2px rgba(201,168,110,0.4)",
-                      "0 0 0 2px rgba(201,168,110,0.8)",
-                      "0 0 0 2px rgba(201,168,110,0.4)",
-                    ],
-                  } : {}}
-                  transition={selected===el.id ? {
-                    duration: 0.6,
-                    repeat: 1,
-                    ease: "easeInOut",
-                  } : { duration: 0 }}
-                  style={{
-                    position:"absolute",
-                    left: el.x - clipLeft,
-                    top: el.y - clipTop,
-                    transform:`translate(-50%,-50%) rotate(${el.rotation}deg) scale(${el.scale})${safeEl.flipX ? " scaleX(-1)" : ""}`,
-                    cursor: dragging.current?.id === el.id ? "grabbing" : "grab",
-                    touchAction: "none",
-                    outline: selected===el.id ? "2px solid #C9A86E" : "none",
-                    outlineOffset: 1,
-                    borderRadius: el.type==="image" ? 4 : 0,
-                    userSelect:"none", zIndex: selected===el.id ? 10 : 5,
-                    pointerEvents: "auto",
-                  }}
+	                  onPointerDown={e => onPointerDown(e, el.id)}
+	                  onClick={e => { e.stopPropagation(); setSelected(el.id); }}
+	                  style={{
+	                    position:"absolute",
+	                    left: el.x - clipLeft,
+	                    top: el.y - clipTop,
+	                    transform:`translate(-50%,-50%) rotate(${el.rotation}deg) scale(${el.scale})${safeEl.flipX ? " scaleX(-1)" : ""}`,
+	                    cursor: dragging.current?.id === el.id ? "grabbing" : "grab",
+	                    touchAction:"none",
+	                    borderRadius: el.type==="image" ? 4 : 0,
+	                    userSelect:"none", zIndex: selected===el.id ? 10 : 5,
+	                    pointerEvents: "auto",
+	                  }}
                 >
                   {renderElementContent(el)}
                 </motion.div>
@@ -1175,103 +1160,6 @@ export default function CustomizePage() {
             })}
               </div>
             </div>
-            {/* ═══ شريط أدوات العنصر المحدد — ثابت في منتصف أسفل الكانفاس ═══ */}
-	            {(() => {
-	              const el = elements.find(e => e.id === selected);
-	              if (!el) return null;
-	              return (
-	                  <motion.div
-	                    initial={{ opacity: 0, y: 10 }}
-	                    animate={{ opacity: 1, y: 0 }}
-	                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-	                    style={{
-	                      position:"absolute",
-	                      bottom: 8,
-	                      left: "50%",
-	                      transform: "translateX(-50%)",
-	                      zIndex: 35,
-	                      pointerEvents:"auto",
-	                      display:"flex",
-	                      alignItems:"center",
-	                      gap: 2,
-	                      background:"#FFFFFF",
-	                      border:"1px solid #E5E7EB",
-	                      borderRadius:10,
-	                      padding:"4px 6px",
-	                      boxShadow:"0 4px 16px rgba(0,0,0,0.12)",
-	                      fontFamily:"Tajawal, sans-serif",
-	                    }}
-	                  >
-	                    {/* حذف */}
-	                    <button
-	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-	                      onClick={e => { e.stopPropagation(); deleteSelected(); }}
-	                      style={{
-	                        width:28, height:28, borderRadius:7,
-	                        background:"#FFF5F5", border:"1px solid #FCA5A5",
-	                        color:"#DC2626", cursor:"pointer",
-	                        display:"flex", alignItems:"center", justifyContent:"center",
-	                      }}
-	                    >
-	                      <X size={13}/>
-	                    </button>
-
-	                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
-
-	                    {/* تصغير */}
-	                    <button
-	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-	                      onClick={e => { e.stopPropagation(); scaleSelected(-0.05); }}
-	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7, fontSize:15 }}>
-	                      −
-	                    </button>
-
-	                    {/* تكبير */}
-	                    <button
-	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-	                      onClick={e => { e.stopPropagation(); scaleSelected(0.05); }}
-	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7, fontSize:15 }}>
-	                      +
-	                    </button>
-
-	                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
-
-	                    {/* دوران يسار */}
-	                    <button
-	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-	                      onClick={e => { e.stopPropagation(); rotateSelected(-10); }}
-	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-	                      <RotateCcw size={12}/>
-	                    </button>
-
-	                    {/* دوران يمين */}
-	                    <button
-	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-	                      onClick={e => { e.stopPropagation(); rotateSelected(10); }}
-	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-	                      <RotateCw size={12}/>
-	                    </button>
-
-	                    <div style={{ width:1, height:20, background:"#E5E7EB" }}/>
-
-	                    {/* نسخ */}
-	                    <button
-	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-	                      onClick={e => { e.stopPropagation(); duplicateSelected(); }}
-	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-	                      <span style={{fontSize:11, fontWeight:700}}>📋</span>
-	                    </button>
-
-	                    {/* تقليب */}
-	                    <button
-	                      onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-	                      onClick={e => { e.stopPropagation(); flipSelected(); }}
-	                      style={{ ...iconBtn, width:28, height:28, borderRadius:7 }}>
-	                      <span style={{fontSize:12}}>↔</span>
-	                    </button>
-	                  </motion.div>
-	              );
-	            })()}
             {/* Print Area Guide — always visible */}
 	            <div style={{
 	              position:"absolute",
