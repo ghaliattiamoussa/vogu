@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   ArrowRight, Package, User, MapPin, CreditCard,
   ShoppingBag, ChevronDown, Loader2, Check, Phone, Mail,
-  Calendar, Hash, Tag, Truck,
+  Calendar, Hash, Tag, Truck, Download, X, ZoomIn,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -84,6 +84,25 @@ export default function OrderDetailPage() {
   const [payOpen,        setPayOpen]        = useState(false);
   const [savingStatus,   setSavingStatus]   = useState(false);
   const [savingPay,      setSavingPay]      = useState(false);
+  const [previewImage,   setPreviewImage]   = useState<string | null>(null);
+
+  // ── تحميل الصورة ──────────────────────────────────────────
+  const downloadImage = async (url: string, filename: string) => {
+    try {
+      const res  = await fetch(url);
+      const blob = await res.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch {
+      // fallback: افتح الرابط في تبويب جديد
+      window.open(url, "_blank");
+    }
+  };
 
   useEffect(() => {
     fetch(`/api/admin/orders/${id}`)
@@ -339,13 +358,41 @@ export default function OrderDetailPage() {
                   className="flex items-center gap-4 p-3 rounded-xl bg-[#121212] border border-[#1A1A1A] hover:border-[#262626] transition-colors"
                 >
                   {/* صورة المنتج */}
-                  <div className="w-16 h-20 rounded-lg bg-[#1A1A1A] flex-shrink-0 overflow-hidden flex items-center justify-center border border-[#262626]">
+                  <div className="w-16 h-20 rounded-lg bg-[#1A1A1A] flex-shrink-0 overflow-hidden flex items-center justify-center border border-[#262626] relative group cursor-pointer"
+                    onClick={() => item.imageUrl && setPreviewImage(item.imageUrl)}
+                  >
                     {item.imageUrl ? (
-                      <Image src={item.imageUrl} alt={item.nameAr} width={64} height={80} className="object-cover w-full h-full" />
+                      <>
+                        <Image src={item.imageUrl} alt={item.nameAr} width={64} height={80} className="object-cover w-full h-full" />
+                        {/* أيقونة تكبير عند التمرير */}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <ZoomIn size={18} className="text-white" />
+                        </div>
+                      </>
                     ) : (
                       <Package size={20} className="text-[#484542]" />
                     )}
                   </div>
+
+                  {/* أزرار الصورة - تظهر لكل المنتجات التي لها صورة */}
+                  {item.imageUrl && (
+                    <div className="flex flex-col gap-1.5 flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); downloadImage(item.imageUrl, `${item.nameAr || "تصميم"}.png`); }}
+                        className="p-1.5 rounded-lg bg-[#1A1200] border border-[#C9A86E]/20 text-[#C9A86E] hover:bg-[#C9A86E]/20 transition-colors"
+                        title="تحميل الصورة"
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPreviewImage(item.imageUrl); }}
+                        className="p-1.5 rounded-lg bg-[#001018] border border-[#7EB8D4]/20 text-[#7EB8D4] hover:bg-[#7EB8D4]/20 transition-colors"
+                        title="عرض بحجم كامل"
+                      >
+                        <ZoomIn size={14} />
+                      </button>
+                    </div>
+                  )}
 
                   {/* التفاصيل */}
                   <div className="flex-1 min-w-0">
@@ -486,6 +533,41 @@ export default function OrderDetailPage() {
 
         </div>
       </div>
+
+      {/* ── مودال معاينة الصورة بحجم كامل ── */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            className="absolute top-4 left-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X size={20} />
+          </button>
+          <div
+            className="relative max-w-[90vw] max-h-[85vh] rounded-2xl overflow-hidden border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewImage}
+              alt="معاينة التصميم"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <a
+            href={previewImage}
+            download="تصميم.png"
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#C9A86E] text-[#070707] text-[13px] font-bold font-tajawal hover:bg-[#C9A86E]/80 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Download size={15} />
+            تحميل الصورة
+          </a>
+        </div>
+      )}
     </div>
   );
 }

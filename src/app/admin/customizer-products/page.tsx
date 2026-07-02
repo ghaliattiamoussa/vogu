@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
-import { Package, Plus, Trash2, Save, X, Palette, Upload, Loader2, ChevronDown, Tag, Check } from 'lucide-react';
+import { Package, Plus, Trash2, Save, X, Palette, Upload, Loader2, ChevronDown, Tag, Check, Download, ZoomIn } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────
 interface CustomColor { name: string; hex: string }
@@ -208,10 +208,26 @@ function ProductCard({ product, onClick }: { product: CustomizerProduct; onClick
   const img = product.frontImage;
   const sideCount = [product.frontImage, product.backImage, product.rightSleeveImage, product.leftSleeveImage].filter(Boolean).length;
 
+  const downloadImage = async (url: string, filename: string) => {
+    try {
+      const res  = await fetch(url);
+      const blob = await res.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch {
+      window.open(url, "_blank");
+    }
+  };
+
   return (
-    <button
+    <div
       onClick={onClick}
-      className="group text-right bg-[#0D0D0D] border border-[#1A1A1A] rounded-2xl overflow-hidden hover:border-[#C9A86E]/40 transition shadow-sm hover:shadow-lg hover:shadow-[#C9A86E]/10"
+      className="group text-right bg-[#0D0D0D] border border-[#1A1A1A] rounded-2xl overflow-hidden hover:border-[#C9A86E]/40 transition shadow-sm hover:shadow-lg hover:shadow-[#C9A86E]/10 cursor-pointer"
     >
       {/* Image */}
       <div className="relative aspect-[4/3] bg-[#070707] overflow-hidden">
@@ -221,6 +237,28 @@ function ProductCard({ product, onClick }: { product: CustomizerProduct; onClick
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="font-cormorant text-6xl text-[#1A1A1A]">VŌGU</span>
+          </div>
+        )}
+        {/* أزرار التحميل والتكبير */}
+        {img && (
+          <div className="absolute bottom-3 left-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => { e.stopPropagation(); downloadImage(img, `${product.label}.png`); }}
+              className="p-2 rounded-lg bg-[#1A1200] border border-[#C9A86E]/30 text-[#C9A86E] hover:bg-[#C9A86E]/30 transition-colors"
+              title="تحميل الصورة"
+            >
+              <Download size={14} />
+            </button>
+            <a
+              href={img}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="p-2 rounded-lg bg-[#001018] border border-[#7EB8D4]/30 text-[#7EB8D4] hover:bg-[#7EB8D4]/30 transition-colors"
+              title="فتح بحجم كامل"
+            >
+              <ZoomIn size={14} />
+            </a>
           </div>
         )}
         {/* badges */}
@@ -251,7 +289,7 @@ function ProductCard({ product, onClick }: { product: CustomizerProduct; onClick
           <span>{product.sizes.length} مقاسات</span>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
