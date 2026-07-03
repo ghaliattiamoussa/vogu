@@ -897,6 +897,7 @@ export default function CustomizePage() {
         flexWrap: isMobile ? "wrap" : "nowrap",
         gap: isMobile ? 8 : 0,
       }}>
+        {/* يسار: رجوع + العنوان */}
         <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 8 : 14 }}>
           <button onClick={handleExitCustomizer} style={{
             display:"flex", alignItems:"center", justifyContent:"center", gap:5,
@@ -915,6 +916,7 @@ export default function CustomizePage() {
           </div>
         </div>
 
+        {/* وسط: تغيير المنتج + تراجع/تقدم */}
         <div style={{ display:"flex", alignItems:"center", gap: isMobile ? 6 : 8, flexWrap: isMobile ? "wrap" : "nowrap" }}>
           {/* زر تغيير المنتج — بدلاً من شريط الأمامي/الخلفي */}
           <button onClick={() => setCatalogOpen(true)} style={{
@@ -924,7 +926,7 @@ export default function CustomizePage() {
             fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 12, cursor:"pointer",
             transition:"all 0.2s",
           }}>
-            🔄 تغيير المنتج
+            🔄 {isMobile ? "تغيير المنتج" : "تغيير المنتج"}
           </button>
 
           {/* أزرار تراجع / تقدم */}
@@ -946,23 +948,23 @@ export default function CustomizePage() {
           }} disabled={histIdx >= history.length - 1}>
             <RotateCw size={isMobile ? 13 : 14}/>
           </button>
-
-          {/* زر إضافة للسلة بدلاً من السعر */}
-          <button onClick={handleAddToCart} style={{
-            display:"flex", alignItems:"center", gap:5,
-            background:"linear-gradient(135deg, #C9A86E, #9A7848)",
-            color:"#FFFFFF", border:"none",
-            padding: isMobile ? "7px 12px" : "8px 18px", borderRadius:10,
-            fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 12,
-            cursor:"pointer", boxShadow:"0 4px 16px #C9A86E30",
-            transition:"all 0.25s",
-          }}>
-            <ShoppingBag size={isMobile ? 13 : 14}/>
-            {isMobile
-              ? `${liveTotalPrice.toLocaleString("ar-EG")} ج.م`
-              : `إضافة للسلة — ${liveTotalPrice.toLocaleString("ar-EG")} ج.م`}
-          </button>
         </div>
+
+        {/* يمين: إضافة للسلة */}
+        <button onClick={handleAddToCart} style={{
+          display:"flex", alignItems:"center", gap:5,
+          background:"linear-gradient(135deg, #C9A86E, #9A7848)",
+          color:"#FFFFFF", border:"none",
+          padding: isMobile ? "7px 12px" : "8px 18px", borderRadius:10,
+          fontFamily:"Tajawal, sans-serif", fontWeight:700, fontSize: isMobile ? 11 : 12,
+          cursor:"pointer", boxShadow:"0 4px 16px #C9A86E30",
+          transition:"all 0.25s",
+        }}>
+          <ShoppingBag size={isMobile ? 13 : 14}/>
+          {isMobile
+            ? `${liveTotalPrice.toLocaleString("ar-EG")} ج.م`
+            : `إضافة للسلة — ${liveTotalPrice.toLocaleString("ar-EG")} ج.م`}
+        </button>
       </div>
 
       <div style={{ display:"flex", height: isMobile ? "calc(100vh - 110px)" : "calc(100vh - 60px)" }}>
@@ -1300,17 +1302,6 @@ export default function CustomizePage() {
             backgroundImage:`linear-gradient(#E5E7EB 1px,transparent 1px),linear-gradient(90deg,#E5E7EB 1px,transparent 1px)`,
             backgroundSize:"40px 40px",
           }}/>
-
-          <CustomizeAiPanel
-            collapsed={!aiPanelOpen}
-            isMobile={isMobile}
-            onToggleCollapse={() => setAiPanelOpen((open) => !open)}
-            context={{
-              productLabel: product.label, productColor: prodColor, size,
-              view: view === "back" ? "back" : "front", elements, selectedId: selected,
-            }}
-            onApply={applyAiResult}
-          />
 
           <div
             ref={canvasRef}
