@@ -244,13 +244,28 @@ export default function CustomizePage() {
   const router    = useRouter();
   const addToCart = useCartStore((s) => s.addItem);
 
-  const [designByView, setDesignByView] = useState<Record<DesignView, DesignElement[]>>({ front: [], back: [], rightSleeve: [], leftSleeve: [] });
+  const [designByView, setDesignByView] = useState<Record<DesignView, DesignElement[]>>(() => {
+    if (typeof window === "undefined") return { front: [], back: [], rightSleeve: [], leftSleeve: [] };
+    try {
+      const saved = localStorage.getItem("vogu-designByView");
+      return saved ? JSON.parse(saved) : { front: [], back: [], rightSleeve: [], leftSleeve: [] };
+    } catch { return { front: [], back: [], rightSleeve: [], leftSleeve: [] }; }
+  });
   const [selected,   setSelected]   = useState<string | null>(null);
   // ✅ العنصر المضغوط عليه حالياً (لإظهار الحدود فقط أثناء اللمس/الضغط)
   const [activePress, setActivePress] = useState<string | null>(null);
   const [tool,       setTool]       = useState<"select"|"text"|"sticker"|"upload"|"ai">("select");
-  const [history,    setHistory]    = useState<DesignElement[][]>([[]]);
-  const [histIdx,    setHistIdx]    = useState(0);
+  const [history,    setHistory]    = useState<DesignElement[][]>(() => {
+    if (typeof window === "undefined") return [[]];
+    try {
+      const saved = localStorage.getItem("vogu-history");
+      return saved ? JSON.parse(saved) : [[]];
+    } catch { return [[]]; }
+  });
+  const [histIdx,    setHistIdx]    = useState(() => {
+    if (typeof window === "undefined") return 0;
+    try { return Number(localStorage.getItem("vogu-histIdx")) || 0; } catch { return 0; }
+  });
   const [stickerPack,setStickerPack]= useState(STICKER_CATEGORIES[0]);
   const [stickerSearch,setStickerSearch]= useState("");
   const [stickerPage,setStickerPage]= useState(1);
@@ -290,6 +305,19 @@ export default function CustomizePage() {
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
   const [bottomSheetContent, setBottomSheetContent] = useState<"tools"|"size"|"color"|"text"|"sticker"|"upload"|"ai"|"selected">("tools");
   const [viewsStripOpen, setViewsStripOpen] = useState(false);
+
+  // ── حفظ حالة التصميم في localStorage تلقائياً ──
+  useEffect(() => {
+    try {
+      localStorage.setItem("vogu-designByView", JSON.stringify(designByView));
+    } catch {}
+  }, [designByView]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("vogu-history", JSON.stringify(history));
+      localStorage.setItem("vogu-histIdx", String(histIdx));
+    } catch {}
+  }, [history, histIdx]);
 
   const sizeScale = SIZE_SCALE[size] ?? 1.0;
   const activePrintArea = getPrintAreaForView(view, product);
