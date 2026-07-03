@@ -1303,6 +1303,17 @@ export default function CustomizePage() {
             backgroundSize:"40px 40px",
           }}/>
 
+          <CustomizeAiPanel
+            collapsed={!aiPanelOpen}
+            isMobile={isMobile}
+            onToggleCollapse={() => setAiPanelOpen((open) => !open)}
+            context={{
+              productLabel: product.label, productColor: prodColor, size,
+              view: view === "back" ? "back" : "front", elements, selectedId: selected,
+            }}
+            onApply={applyAiResult}
+          />
+
           <div
             ref={canvasRef}
             style={{
